@@ -1,0 +1,252 @@
+{
+  "main": {
+    "id": "310e58a53fd3532b",
+    "type": "split",
+    "children": [
+      {
+        "id": "49fe534dafa71127",
+        "type": "tabs",
+        "dimension": 57.172342621259034,
+        "children": [
+          {
+            "id": "e5677bed27823b23",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "notizen/daily/2025-05-10.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "2025-05-10"
+            }
+          }
+        ]
+      },
+      {
+        "id": "7f980c15325aa49c",
+        "type": "tabs",
+        "dimension": 42.827657378740966,
+        "children": [
+          {
+            "id": "b8a84393e86a1e26",
+            "type": "leaf",
+            "pinned": true,
+            "state": {
+              "type": "terminal:terminal",
+              "state": {
+                "terminal:terminal": {
+                  "cwd": "/Users/manueleigen/Desktop/REACT/PROJEKT/APP/vault-example",
+                  "focus": false,
+                  "profile": {
+                    "args": [
+                      "--login"
+                    ],
+                    "executable": "/bin/zsh",
+                    "followTheme": true,
+                    "name": "",
+                    "platforms": {
+                      "darwin": true
+                    },
+                    "pythonExecutable": "python3",
+                    "restoreHistory": false,
+                    "rightClickAction": "copyPaste",
+                    "successExitCodes": [
+                      "0",
+                      "SIGINT",
+                      "SIGTERM"
+                    ],
+                    "terminalOptions": {
+                      "documentOverride": null
+                    },
+                    "type": "integrated",
+                    "useWin32Conhost": true
+                  },
+                  "profileSourceId": "darwinIntegratedDefault",
+                  "serial": null
+                }
+              },
+              "pinned": true,
+              "icon": "terminal",
+              "title": "Terminal: zsh"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "364f3278dc1760f3",
+    "type": "split",
+    "children": [
+      {
+        "id": "39e215226c684479",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "f41e9becff8abd5d",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Dateiexplorer"
+            }
+          },
+          {
+            "id": "c40f5997f6275372",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "Suchen"
+            }
+          },
+          {
+            "id": "7a76a193e6ba392b",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "Lesezeichen"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "fab0fc0c69c708ed",
+    "type": "split",
+    "children": [
+      {
+        "id": "108105fd26618b65",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "63e6e9fcffe00097",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "archiv/projekt-stadtbibliothek-2024.md",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "Rückverweise auf projekt-stadtbibliothek-2024"
+            }
+          },
+          {
+            "id": "9b940461ff7625d8",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "archiv/projekt-stadtbibliothek-2024.md",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "Ausgehende Links von projekt-stadtbibliothek-2024 öffnen"
+            }
+          },
+          {
+            "id": "ba502aa500289149",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "Tags"
+            }
+          },
+          {
+            "id": "f71066b34707aa96",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "Alle Eigenschaften"
+            }
+          },
+          {
+            "id": "d22903edb045ecc1",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "archiv/projekt-stadtbibliothek-2024.md",
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "Gliederung von projekt-stadtbibliothek-2024"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "obsidian-git:Open Git source control": false,
+      "switcher:Schnellauswahl öffnen": false,
+      "graph:Graph-Ansicht öffnen": false,
+      "canvas:Neuen Canvas erstellen": false,
+      "daily-notes:Heutige Notiz öffnen": false,
+      "templates:Vorlage einfügen": false,
+      "command-palette:Befehlspalette öffnen": false,
+      "bases:Neue Base erstellen": false,
+      "terminal:Open terminal": false
+    }
+  },
+  "active": "b8a84393e86a1e26",
+  "lastOpenFiles": [
+    "notizen/daily/2025-05-10.md",
+    "clients/bloom-ecommerce-gmbh.md",
+    "profile/skills/area/event.md",
+    "clients/bewegung-aktiv-ev2.md",
+    "archiv/projekt-stadtbibliothek-2026.md",
+    "clients/vertex-finance-ag.md",
+    "product-ideas/digital-tools/a11y-figma-plugin.md",
+    "clients/_template.md",
+    "clients/ModulapStudio.md",
+    "archiv/projekt-stadtbibliothek-2024.md"
+  ]
+}
