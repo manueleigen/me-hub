@@ -601,50 +601,48 @@ Es gibt zwei separate Repos:
 
 ## Roadmap
 
-### Phase 1 — Foundation (Woche 1-2)
+### Phase 1 — Foundation (Abgeschlossen ✅)
 
-- [ ] Next.js Projekt aufsetzen (App Router, Tailwind, shadcn/ui)
-- [ ] Prisma Postgres Setup (prisma.io)
-- [ ] better-auth Integration
-- [ ] `zeiterfassung/` Ordner + `_schemas/` Ordner zum Vault hinzufügen
-- [ ] GitHub API Service: `useGitHubFile(path)` Hook (laden, speichern, listen)
-- [ ] Webhook-Endpoint für ISR Revalidation + Vault-Index Sync
-- [ ] VaultEntry Prisma Model + Initial-Reindex Route (`/api/admin/reindex`)
-- [ ] Novel-Editor Komponente einbinden + Markdown↔Editor Konvertierung
-- [ ] Wiederverwendbare `<EntryEditor>` Komponente (Frontmatter-Form + Novel + Save)
+- [x] Next.js Projekt aufsetzen (App Router, Tailwind, shadcn/ui)
+- [x] Prisma Postgres Setup (für Auth & User Settings)
+- [x] better-auth Integration (GitHub OAuth)
+- [x] GitHub API Service: Octokit Integration & Server Actions für File-CRUD
+- [x] Novel-Editor Komponente integriert
+- [x] Grundstruktur der Module im Vault (`zeiterfassung/`, `product-ideas/`, `clients/`)
+- [x] Optimistisches UI & Sync-Status Tracking (`SyncContext`)
 
-### Phase 2 — Erstes Modul: Zeiterfassung (Woche 2-3)
+### Phase 2 — Core Module (In Arbeit 🏗️)
 
-- [ ] Frontmatter-Schema definieren
-- [ ] Obsidian Template erstellen
-- [ ] Quick-Entry Formular (kein Novel — reines Formular)
-- [ ] Tages-/Wochenansicht (verlinkt mit clients/)
-- [ ] Auswertungen (Monat, Projekt, Kunde)
+- [x] **Zeiterfassung**: Quick-Entry, Wochenansicht, Projekt-Filter (GitHub-backed)
+- [x] **Produkt-Ideen**: Kanban-Board & Detail-Editing (GitHub-backed)
+- [x] **Kunden**: Übersicht & Verknüpfung mit Zeiterfassung
+- [x] **Vault Browser**: Draggable File-Tree & File Explorer
+- [ ] **Auswertungen**: Monatssummen & Visualisierung der Arbeitsstunden
+- [ ] **Webhook-Endpoint**: ISR Revalidation & GitHub Sync (Push-Trigger)
 
-### Phase 3 — MCP Server (Woche 3-4)
+### Phase 3 — MCP Server & AI Integration (Nächste Priorität 🎯)
 
-- [ ] Remote MCP Endpoint implementieren
-- [ ] Core Tools: list/get/create/update
-- [ ] Modul-spezifische Tools (log_hours etc.)
-- [ ] API Key Management UI
-- [ ] Audit Logging
-- [ ] Claude Project einrichten und testen
+- [ ] Remote MCP Endpoint implementieren (`/api/mcp`)
+- [ ] API Key Management UI in den Einstellungen
+- [ ] Core Tools: `list_entries`, `get_entry`, `create_entry`, `update_entry`
+- [ ] Modul-spezifische Tools: `log_hours`, `add_idea`
+- [ ] Audit Logging für MCP Calls
+- [ ] Claude Project Setup & System Prompt Optimierung
 
-### Phase 4 — Weitere Module (Woche 4-6)
+### Phase 4 — Content & Profil (Woche 6-8)
 
-- [ ] Produkt-Ideen: Kanban-Board + Novel für Detail-Editing
-- [ ] Werdegang: Listenansicht + Novel-Editor für profile/\* Dateien
-- [ ] Content: Plattform-Übersicht + Novel als Schreib-Editor
-- [ ] Content-Pipeline API für Website (→ Strapi)
-- [ ] MCP Tools für neue Module ergänzen
+- [ ] **Content**: Plattform-Übersicht (LinkedIn, Malt etc.) & Novel-Editor
+- [ ] **Profil**: Erweiterte Werdegang-Verwaltung (profile/*)
+- [ ] **Content-Pipeline**: API für Website (Strapi-Integration)
+- [ ] **Vault Indexing**: Frontmatter-Index in PostgreSQL (für komplexe Queries & Speed) — *Zuvor auf GitHub-only vereinfacht*
 
-### Phase 5 — Polish & Iterate (fortlaufend)
+### Phase 5 — Polish & Power Features (Fortlaufend)
 
-- [ ] Dashboard / Übersichtsseite
-- [ ] Mobile-optimierte Views (Novel ist mobile-ready)
-- [ ] Tiptap-Extensions: Wiki-Links, Callouts, Custom Blöcke
-- [ ] Neue Module nach Bedarf
-- [ ] Performance-Optimierung (Caching, GitHub API Limits)
+- [ ] **Dashboard**: Zentrale Übersicht mit Live-Metriken & Quick-Actions
+- [ ] **PWA**: Installierbare App für mobilen Schnellzugriff
+- [ ] **Command Palette**: Cmd+K für globale Suche & Aktionen
+- [ ] **Automationen**: Wöchentliche Zusammenfassungen via Vercel Cron
+- [ ] **Tiptap-Extensions**: Wiki-Links (`[[link]]`) & Callouts für Obsidian-Kompatibilität
 
 ---
 
