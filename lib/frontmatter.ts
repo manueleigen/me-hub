@@ -1,3 +1,16 @@
+export function coerceStringArray(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.filter((item): item is string => typeof item === "string" && item.trim() !== "");
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return [];
+    if (trimmed.startsWith("- ")) return [trimmed.slice(2).trim()];
+    return [trimmed];
+  }
+  return [];
+}
+
 export function slugify(str: string): string {
   return str
     .toLowerCase()
@@ -48,6 +61,9 @@ export function parseFrontmatter(raw: string): {
     if (value === "") {
       currentKey = key;
       currentArray = [];
+    } else if (value.startsWith("- ")) {
+      currentKey = key;
+      currentArray = [value.slice(2).trim()];
     } else if (value === "true") {
       data[key] = true;
     } else if (value === "false") {

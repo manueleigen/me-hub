@@ -5,59 +5,51 @@ import {
   createOrUpdateGitHubFile,
   deleteGitHubFile,
 } from "@/app/actions/github";
-import { parseFrontmatter, serializeFrontmatter, slugify } from "@/lib/frontmatter";
+import { resolveFileSha } from "@/lib/github/resolve-file-sha";
+import { parseCommentsValue } from "@/lib/aufgaben/task-file";
+import { parseFrontmatter, serializeFrontmatter } from "@/lib/frontmatter";
+import {
+	getListedFileBody,
+	getListedFileFrontmatter,
+} from "@/lib/vault/listed-file";
+import { listMarkdownUnderPrefix } from "@/lib/vault/list-markdown";
+import { vaultModuleEntrySlugFromBasename } from "@/lib/vault/mirrorable-text-files";
+import type { TaskComment } from "@/types/aufgaben";
 import type { ProductIdea, ProductIdeaFrontmatter, IdeaStatus } from "@/types/produkt-ideen";
 
 const IDEAS_FOLDER = "product-ideas";
 
 export async function listProductIdeas(): Promise<ProductIdea[]> {
-  const dir = await getGitHubItem(IDEAS_FOLDER);
-  if (!dir || !Array.isArray(dir)) return [];
+  const files = await listMarkdownUnderPrefix(IDEAS_FOLDER);
 
-  const categoryDirs = (
-    dir as { name: string; path: string; sha: string; type: string }[]
-  ).filter((f) => f.type === "dir");
-
-  const allIdeas = await Promise.all(
-    categoryDirs.map(async (catDir) => {
-      const catContents = await getGitHubItem(catDir.path);
-      if (!catContents || !Array.isArray(catContents)) return [];
-
-      const mdFiles = (
-        catContents as { name: string; path: string; sha: string; type: string }[]
-      ).filter((f) => f.type === "file" && f.name.endsWith(".md") && !f.name.startsWith("_"));
-
-      const ideas = await Promise.all(
-        mdFiles.map(async (f) => {
-          const file = await getGitHubItem(f.path);
-          if (!file || Array.isArray(file) || !("content" in file)) return null;
-          const { data, content } = parseFrontmatter(file.content as string);
-          const slug = f.name.replace(/\.md$/, "");
-          const idea: ProductIdea = {
-            slug,
-            categorySlug: catDir.name,
-            sha: (file as { sha?: string }).sha,
-            body: content,
-            title: (data.title as string) ?? slug,
-            description: (data.description as string) ?? "",
-            category: (data.category as string) ?? catDir.name,
-            status: (data.status as IdeaStatus) ?? "idea",
-            priority: (data.priority as ProductIdea["priority"]) ?? "medium",
-            targetAudience: data.targetAudience as string | undefined,
-            potentialRevenue: data.potentialRevenue as string | undefined,
-            effortEstimate: data.effortEstimate as string | undefined,
-            tags: (data.tags as string[]) ?? [],
-            notes: data.notes as string | undefined,
-          };
-          return idea;
-        }),
-      );
-
-      return ideas.filter((i): i is ProductIdea => i !== null);
-    }),
-  );
-
-  return allIdeas.flat();
+  return files
+    .map((f) => {
+      const parts = f.path.split("/");
+      if (parts.length < 3) return null;
+      const categorySlug = parts[1];
+      const slug = vaultModuleEntrySlugFromBasename(f.name);
+      const data = getListedFileFrontmatter(f);
+      const content = getListedFileBody(f);
+      const idea: ProductIdea = {
+        slug,
+        categorySlug,
+        sha: f.sha,
+        body: content,
+        title: (data.title as string) ?? slug,
+        description: (data.description as string) ?? "",
+        category: (data.category as string) ?? categorySlug,
+        status: (data.status as IdeaStatus) ?? "idea",
+        priority: (data.priority as ProductIdea["priority"]) ?? "medium",
+        targetAudience: data.targetAudience as string | undefined,
+        potentialRevenue: data.potentialRevenue as string | undefined,
+        effortEstimate: data.effortEstimate as string | undefined,
+        tags: Array.isArray(data.tags) ? (data.tags as string[]) : [],
+        notes: data.notes as string | undefined,
+        comments: parseCommentsValue(data.comments),
+      };
+      return idea;
+    })
+    .filter((i): i is ProductIdea => i !== null);
 }
 
 export async function saveProductIdea(
@@ -67,6 +59,7 @@ export async function saveProductIdea(
   body: string,
   sha?: string,
   oldCategorySlug?: string,
+  comments: TaskComment[] = [],
 ): Promise<void> {
   const frontmatterData: Record<string, unknown> = {
     title: data.title,
@@ -79,20 +72,25 @@ export async function saveProductIdea(
     effortEstimate: data.effortEstimate ?? "",
     tags: data.tags,
     notes: data.notes ?? "",
+    comments: JSON.stringify(comments),
   };
   const content = serializeFrontmatter(frontmatterData, body);
   const newPath = `${IDEAS_FOLDER}/${categorySlug}/${slug}.md`;
 
   if (oldCategorySlug && oldCategorySlug !== categorySlug && sha) {
-    // Category changed: create in new folder (no sha), delete from old folder
+    const oldPath = `${IDEAS_FOLDER}/${oldCategorySlug}/${slug}.md`;
+    const resolvedSha = await resolveFileSha(oldPath, sha);
     await createOrUpdateGitHubFile(newPath, content, `Move idea to ${categorySlug}: ${data.title}`);
-    await deleteGitHubFile(`${IDEAS_FOLDER}/${oldCategorySlug}/${slug}.md`, sha);
+    if (resolvedSha) {
+      await deleteGitHubFile(oldPath, resolvedSha);
+    }
   } else {
+    const resolvedSha = sha ? await resolveFileSha(newPath, sha) : undefined;
     await createOrUpdateGitHubFile(
       newPath,
       content,
       `${sha ? "Update" : "Create"} idea: ${data.title}`,
-      sha,
+      resolvedSha,
     );
   }
 }
@@ -102,7 +100,12 @@ export async function deleteProductIdea(
   slug: string,
   sha: string,
 ): Promise<void> {
-  await deleteGitHubFile(`${IDEAS_FOLDER}/${categorySlug}/${slug}.md`, sha);
+  const path = `${IDEAS_FOLDER}/${categorySlug}/${slug}.md`;
+  const resolvedSha = await resolveFileSha(path, sha);
+  if (!resolvedSha) {
+    throw new Error(`Idea not found: ${slug}`);
+  }
+  await deleteGitHubFile(path, resolvedSha);
 }
 
 export async function updateIdeaStatus(
@@ -113,7 +116,14 @@ export async function updateIdeaStatus(
 ): Promise<void> {
   const path = `${IDEAS_FOLDER}/${categorySlug}/${slug}.md`;
   const file = await getGitHubItem(path);
-  if (!file || Array.isArray(file) || !("content" in file)) return;
+  if (!file || Array.isArray(file) || !("content" in file)) {
+    throw new Error(`Idea not found: ${slug}`);
+  }
+
+  const resolvedSha = await resolveFileSha(path, sha);
+  if (!resolvedSha) {
+    throw new Error(`Could not resolve file SHA for idea: ${slug}`);
+  }
 
   const { data, content } = parseFrontmatter(file.content as string);
   const frontmatterData: Record<string, unknown> = {
@@ -121,5 +131,10 @@ export async function updateIdeaStatus(
     status: newStatus,
   };
   const newContent = serializeFrontmatter(frontmatterData, content);
-  await createOrUpdateGitHubFile(path, newContent, `Update idea status: ${slug} → ${newStatus}`, sha);
+  await createOrUpdateGitHubFile(
+    path,
+    newContent,
+    `Update idea status: ${slug} → ${newStatus}`,
+    resolvedSha,
+  );
 }

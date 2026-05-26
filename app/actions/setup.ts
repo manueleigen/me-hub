@@ -1,6 +1,8 @@
 "use server";
 
 import { createOrUpdateGitHubFile } from "@/app/actions/github";
+import { requireWorkspaceAdmin } from "@/app/actions/workspace-settings";
+import { resolveActiveWorkspaceForUser } from "@/app/actions/workspaces";
 
 const TEMPLATES: { path: string; content: string }[] = [
   {
@@ -82,6 +84,12 @@ notes: ""
 ];
 
 export async function createVaultTemplates(): Promise<{ created: string[]; errors: string[] }> {
+  const resolved = await resolveActiveWorkspaceForUser();
+  if (!resolved) {
+    throw new Error("No active workspace.");
+  }
+  await requireWorkspaceAdmin(resolved.workspace.id);
+
   const created: string[] = [];
   const errors: string[] = [];
 

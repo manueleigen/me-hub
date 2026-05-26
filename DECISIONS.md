@@ -155,6 +155,23 @@ Format: date · decision · context · alternatives considered · rationale.
 
 **Rationale**: The server/client split at the layout boundary is the idiomatic Next.js App Router pattern: server component fetches, client wrapper provides context. `VaultShell` is the thin bridge.
 
+**Update (2026-05-24)**: `SyncProvider` + `VaultEditorGuardProvider` moved to `DashboardOperationProviders` in `dashboard-shell.tsx`. `VaultShell` is layout-only (sidebar + children). Status UI is no longer in `VaultShell`.
+
+---
+
+## 2026-05-24 — Unified app status indicator + background save as default
+
+**Decision**: One top-right pill (`AppStatusIndicator`) aggregates GitHub writes (`SyncProvider`), Vault navigation saves (`VaultEditorGuardProvider`), and mirror sync (`VaultSyncProvider`). Routine saves use background persist + indicator; no duplicate bottom-right pill or success toasts. React modules use `useBackgroundSave()` (wraps `startSync`/`endSync` + `runBackgroundSave`).
+
+**Context**: Four separate UX surfaces (bottom save pill, top sync dot, toasts, inline button text) overlapped and conflicted. Users expect to navigate away while saves finish.
+
+**Alternatives considered**:
+
+- Keep separate indicators per subsystem — simpler code but confusing UX.
+- Toast-only for all saves — too easy to miss during navigation.
+
+**Rationale**: `resolveAppStatus()` centralizes priority. `DashboardOperationProviders` wraps the full chrome so sidebar links trigger navigation background-save. `template.tsx` still owns `VaultSyncProvider` (needs per-navigation sync tick). See `DOCUMENTATION.md` → *Background save* and *UI status indicator*.
+
 ---
 
 ## 2026-05-12 — Native HTML5 Drag and Drop for vault tree (no library)
@@ -381,6 +398,58 @@ Format: date · decision · context · alternatives considered · rationale.
 - `.env` fallback for migration — removed to avoid two sources of truth; configure once in **Profil** after deploy.
 
 **Rationale**: DB columns on `User` keep vault targeting explicit and editable without redeploying. `getVaultConfig()` is called from `app/actions/github.ts` and `vault/layout.tsx` (for `gitHubBase`), keeping the lookup centralised.
+
+---
+
+## 2026-05-23 — Multi-user workspace architecture (Workspace as the unit of collaboration)
+
+**Decision**: Introduce `Workspace` as the central entity replacing per-`User` vault config. Every user gets a personal workspace on registration. Team workspaces can be created and shared. All data (vault config, sync state, file mirrors, pages, members) lives on the workspace.
+
+**Context**: The app was single-admin. As multi-user collaboration became a goal, the `User` row was too narrow — it conflated identity with vault config. Two users can't share a vault because the sync state was stored on the user.
+
+**Alternatives considered**:
+- Keep per-user config with a "shared user" account — a hack; doesn't scale to real multi-user.
+- Separate `VaultConfig` model linked to `User` — a stepping stone, but doesn't enable team workspaces.
+
+**Rationale**: The `Workspace` model matches the mental model of an Obsidian vault: one GitHub repo, one set of pages, multiple members with roles. Personal workspaces are created automatically; team workspaces are created explicitly. The `WorkspaceMember` join table handles roles (OWNER/ADMIN/MEMBER/VIEWER).
+
+---
+
+## 2026-05-23 — WorkspaceContextHost: client-side workspace context sync via x-pathname header
+
+**Decision**: Workspace context for the sidebar is provided by a server component (`DashboardWorkspaceBoundary`) that reads the `x-pathname` header (set by middleware for every request) to determine the current workspace slug. It resolves workspace data server-side and passes it to `WorkspaceContextHost` (a client component) which holds it in state and re-fetches via server action when the URL slug changes on client navigations.
+
+**Context**: `AppSidebar` lives in `DashboardShell` (inside `(dashboard)/layout.tsx`) — a level above the `w/[workspaceSlug]/layout.tsx` where the `WorkspaceProvider` was originally placed. In Next.js App Router, parent layout components cannot be inside a child layout's providers. The sidebar therefore always got `null` from `useWorkspace()`.
+
+**Alternatives considered**:
+- Route group restructuring: move sidebar into `w/[workspaceSlug]/layout.tsx` and create a separate `(shell)/layout.tsx` for non-workspace routes — correct but requires moving many page files.
+- Client-only bootstrap: read pathname on the client, fetch workspace data, accept a loading flash — simpler but worse UX.
+
+**Rationale**: The `x-pathname` header approach resolves workspace data on the server for the initial render (no flash, no loading state) while `WorkspaceContextHost`'s `useEffect` keeps it in sync on subsequent client-side navigations. Middleware already sets `x-pathname` on every request, so no new infrastructure was needed.
+
+---
+
+## 2026-05-23 — Workspace pages are configurable templates, reusable multiple times
+
+**Decision**: Each `WorkspacePage` row has a `templateKey` (e.g. `"aufgaben"`) that determines which React component renders it, and a `slug` that determines the URL. Multiple pages of the same template type are allowed (e.g. two separate "Aufgaben" pages pointing to different vault folders). Slug conflicts are resolved automatically by appending `-2`, `-3`, etc.
+
+**Context**: Originally the pages manager filtered out templates already in use, enforcing one-page-per-template. Users want to split content across multiple pages of the same type (e.g. separate task boards per project, each backed by a different vault subfolder).
+
+**Alternatives considered**:
+- One page per template strictly — simpler but inflexible.
+- Free-form page types without templates — too open; loses the component routing mechanism.
+
+**Rationale**: Template keys are the routing mechanism (mapped in `[pageSlug]/page.tsx` to React components). Allowing reuse with different slugs and `dataFolder` configs gives flexible workspace layouts without duplicating component code. The slug deduplication in `addWorkspacePage` is a server-side guard so the database `@@unique([workspaceId, slug])` constraint is never violated.
+
+---
+
+## 2026-05-23 — Workspace settings and pages management consolidated on one page
+
+**Decision**: The separate `/w/[slug]/settings/pages` route was removed. Page management (`WorkspacePagesManager`) is embedded directly in `/w/[slug]/settings`, alongside workspace name, GitHub config, and member management.
+
+**Context**: The settings page previously had a card linking to a separate pages route. The user had to click through to reach page configuration. For a settings panel with ~6 pages, this extra navigation is unnecessary friction.
+
+**Rationale**: A single long-scroll settings page is easier to discover and faster to use. All workspace configuration (identity, vault sync, members, pages) is in one place. The `/settings/pages` route is kept as a redirect for any bookmarked links.
 
 ---
 

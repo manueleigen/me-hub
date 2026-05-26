@@ -41,6 +41,13 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
 
 export function useSync() {
 	const ctx = useContext(SyncContext);
-	if (!ctx) throw new Error("useSync must be used within SyncProvider");
+	if (!ctx) {
+		return {
+			pending: 0,
+			lastSavedAt: null,
+			startSync: () => {},
+			endSync: () => {},
+		};
+	}
 	return ctx;
 }

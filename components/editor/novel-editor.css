@@ -1,0 +1,110 @@
+.novel-editor .ProseMirror {
+	min-height: 420px;
+	padding-top: 0.5rem;
+	padding-bottom: 0.5rem;
+	outline: none;
+}
+
+.novel-editor .ProseMirror .is-editor-empty:first-child::before,
+.novel-editor .ProseMirror .is-empty::before {
+	content: attr(data-placeholder);
+	float: left;
+	color: hsl(var(--muted-foreground));
+	pointer-events: none;
+	height: 0;
+}
+
+.novel-editor .ProseMirror img {
+	transition: filter 0.1s ease-in-out;
+}
+
+.novel-editor .ProseMirror img:hover {
+	cursor: pointer;
+	filter: brightness(90%);
+}
+
+.novel-editor .ProseMirror img.ProseMirror-selectednode {
+	outline: 3px solid hsl(var(--ring));
+	filter: brightness(90%);
+}
+
+.novel-editor .img-placeholder {
+	position: relative;
+}
+
+.novel-editor .img-placeholder::before {
+	content: "";
+	box-sizing: border-box;
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	width: 36px;
+	height: 36px;
+	border-radius: 50%;
+	border: 3px solid hsl(var(--border));
+	border-top-color: hsl(var(--foreground));
+	animation: novel-spinning 0.6s linear infinite;
+}
+
+@keyframes novel-spinning {
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+.novel-editor ul[data-type="taskList"] li > label {
+	margin-right: 0.2rem;
+	user-select: none;
+}
+
+.novel-editor ul[data-type="taskList"] li > label input[type="checkbox"] {
+	-webkit-appearance: none;
+	appearance: none;
+	background-color: hsl(var(--background));
+	margin: 0;
+	cursor: pointer;
+	width: 1.2em;
+	height: 1.2em;
+	position: relative;
+	top: 5px;
+	border: 2px solid hsl(var(--border));
+	margin-right: 0.3rem;
+	display: grid;
+	place-content: center;
+}
+
+.novel-editor ul[data-type="taskList"] li > label input[type="checkbox"]:hover {
+	background-color: hsl(var(--accent));
+}
+
+.novel-editor ul[data-type="taskList"] li > label input[type="checkbox"]::before {
+	content: "";
+	width: 0.65em;
+	height: 0.65em;
+	transform: scale(0);
+	transition: 120ms transform ease-in-out;
+	box-shadow: inset 1em 1em hsl(var(--foreground));
+	transform-origin: center;
+	clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
+}
+
+.novel-editor ul[data-type="taskList"] li > label input[type="checkbox"]:checked::before {
+	transform: scale(1);
+}
+
+.novel-editor ul[data-type="taskList"] li[data-checked="true"] > div > p {
+	color: hsl(var(--muted-foreground));
+	text-decoration: line-through;
+	text-decoration-thickness: 2px;
+}
+
+.novel-editor .tippy-box {
+	max-width: 400px !important;
+}
+
+.novel-editor .ProseMirror:not(.dragging) .ProseMirror-selectednode {
+	outline: none !important;
+	background-color: var(--novel-highlight-blue);
+	transition: background-color 0.2s;
+	box-shadow: none;
+}

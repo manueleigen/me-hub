@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Computer as Github, Stone, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,6 +21,8 @@ import { authClient } from "@/lib/auth-client";
 
 export default function LoginPage() {
 	const router = useRouter();
+	const searchParams = useSearchParams();
+	const callbackUrl = searchParams.get("callbackUrl") ?? "/";
 	const [isLoading, setIsLoading] = React.useState(false);
 	const [email, setEmail] = React.useState("");
 	const [password, setPassword] = React.useState("");
@@ -39,13 +41,13 @@ export default function LoginPage() {
 			return;
 		}
 
-		router.push("/");
+		router.push(callbackUrl);
 		router.refresh();
 	};
 
 	const handleGitHubLogin = async () => {
 		setIsLoading(true);
-		await authClient.signIn.social({ provider: "github", callbackURL: "/" });
+		await authClient.signIn.social({ provider: "github", callbackURL: callbackUrl });
 	};
 
 	return (

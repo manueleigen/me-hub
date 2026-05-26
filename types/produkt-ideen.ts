@@ -1,3 +1,5 @@
+import type { TaskComment } from "@/types/aufgaben";
+
 export type IdeaStatus =
 	| "idea"
 	| "validating"
@@ -42,6 +44,7 @@ export interface ProductIdea extends ProductIdeaFrontmatter {
 	categorySlug: string;
 	sha?: string;
 	body: string;
+	comments: TaskComment[];
 }
 
 export const STATUS_CONFIG: Record<

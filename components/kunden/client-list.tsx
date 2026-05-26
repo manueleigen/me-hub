@@ -35,7 +35,7 @@ export function ClientList({ clients }: ClientListProps) {
           .toUpperCase()
 
         return (
-          <Link key={client.id} href={`/kunden/${client.id}`}>
+          <Link key={client.id} href={`/clients/${client.id}`}>
             <Card className="hover:shadow-md transition-shadow cursor-pointer h-full">
               <CardContent className="p-4">
                 <div className="flex items-start gap-3">
@@ -47,7 +47,7 @@ export function ClientList({ clients }: ClientListProps) {
                   
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <h3 className="font-semibold truncate">{client.name}</h3>
+                      <h3 className="font-semibold truncate hover:underline">{client.name}</h3>
                       <Badge className={cn("text-white shrink-0 text-xs", statusConfig.color)}>
                         {statusConfig.label}
                       </Badge>

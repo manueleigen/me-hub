@@ -618,7 +618,7 @@ Es gibt zwei separate Repos:
 - [x] **Kunden**: Übersicht & Verknüpfung mit Zeiterfassung
 - [x] **Vault Browser**: Draggable File-Tree & File Explorer
 - [ ] **Auswertungen**: Monatssummen & Visualisierung der Arbeitsstunden
-- [ ] **Webhook-Endpoint**: ISR Revalidation & GitHub Sync (Push-Trigger)
+- [x] **Webhook-Endpoint**: `/api/webhook/github` — vault mirror sync on push (ISR/site revalidation optional)
 
 ### Phase 3 — MCP Server & AI Integration (Nächste Priorität 🎯)
 

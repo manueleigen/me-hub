@@ -8,8 +8,14 @@ import { cn } from "@/lib/utils";
 function ScrollArea({
 	className,
 	children,
+	contentMinFullHeight = false,
+	onViewportContextMenu,
 	...props
-}: React.ComponentProps<typeof ScrollAreaPrimitive.Root>) {
+}: React.ComponentProps<typeof ScrollAreaPrimitive.Root> & {
+	/** Stretch inner content to at least the viewport height (vault tree background). */
+	contentMinFullHeight?: boolean;
+	onViewportContextMenu?: React.MouseEventHandler<HTMLDivElement>;
+}) {
 	return (
 		<ScrollAreaPrimitive.Root
 			data-slot="scroll-area"
@@ -18,7 +24,13 @@ function ScrollArea({
 		>
 			<ScrollAreaPrimitive.Viewport
 				data-slot="scroll-area-viewport"
-				className="size-full rounded-[inherit] transition-[color,box-shadow] outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-1 [&>div]:!block"
+				onContextMenu={onViewportContextMenu}
+				className={cn(
+					"size-full rounded-[inherit] transition-[color,box-shadow] outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-1",
+					contentMinFullHeight
+						? "[&>div]:!flex [&>div]:min-h-full [&>div]:w-full"
+						: "[&>div]:!block",
+				)}
 			>
 				{children}
 			</ScrollAreaPrimitive.Viewport>

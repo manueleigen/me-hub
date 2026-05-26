@@ -1,17 +1,18 @@
 import { features } from "@/lib/config";
 import type { VaultFile, VaultTreeNode } from "@/types/vault";
-import {
-	mockVaultFiles,
-	findVaultFile,
-	getVaultBreadcrumbs,
-	flattenVaultTree,
-} from "@/lib/mock-data/vault";
+import { getVaultBreadcrumbs } from "@/lib/vault/tree-utils";
 import {
 	getGitHubItem,
 	getGitHubTree,
 	createOrUpdateGitHubFile,
 	deleteGitHubFile,
 } from "@/app/actions/github";
+import { VaultPathExistsError, isGithubPathExistsError } from "@/lib/vault/errors";
+
+function normalizeGitTree(gitData: unknown): any[] {
+	if (!gitData || !Array.isArray(gitData)) return [];
+	return gitData;
+}
 
 export function createVaultService(opts: { githubSync?: boolean } = {}) {
 	const useGithubSync = opts.githubSync ?? features.githubSync;
@@ -19,14 +20,15 @@ export function createVaultService(opts: { githubSync?: boolean } = {}) {
 	return {
 		async getTree(): Promise<VaultTreeNode[]> {
 			if (useGithubSync) {
-				const gitData = (await getGitHubTree()) as any[];
+				const gitData = normalizeGitTree(await getGitHubTree());
+				if (gitData.length === 0) return [];
 				const filtered = gitData.filter(
 					(item: any) =>
 						!item.path.endsWith("/.gitkeep") && item.path !== ".gitkeep",
 				);
 				return convertGitTreeToNestedNodes(filtered);
 			}
-			return convertToTreeNodes(mockVaultFiles);
+			return [];
 		},
 
 		async getFile(path: string): Promise<VaultFile | null> {
@@ -42,7 +44,7 @@ export function createVaultService(opts: { githubSync?: boolean } = {}) {
 					type: "file",
 				};
 			}
-			return findVaultFile(path);
+			return null;
 		},
 
 		async getFolderContents(path: string): Promise<VaultFile[]> {
@@ -62,43 +64,15 @@ export function createVaultService(opts: { githubSync?: boolean } = {}) {
 					...(item.type === "dir" ? { children: [] } : {}),
 				})));
 			}
-			const allFiles = flattenVaultTree();
-			return sortVaultNodes(allFiles
-				.filter((f: VaultFile) => {
-					const parent = f.path.substring(0, f.path.lastIndexOf("/"));
-					return parent === path;
-				})
-				.map((f: VaultFile) => ({
-					path: f.path,
-					name: f.title || f.name,
-					title: f.title || f.name,
-					type: f.type,
-					...(f.type === "directory" ? { children: [] } : {}),
-				})));
+			return [];
 		},
 
-		async search(query: string): Promise<VaultFile[]> {
-			const allFiles = flattenVaultTree();
-			const lowercaseQuery = query.toLowerCase();
-			return allFiles.filter((file: VaultFile) => {
-				if (file.title.toLowerCase().includes(lowercaseQuery)) return true;
-				if (file.path.toLowerCase().includes(lowercaseQuery)) return true;
-				if (file.content?.toLowerCase().includes(lowercaseQuery)) return true;
-				if (
-					file.frontmatter?.tags?.some((tag: string) =>
-						tag.toLowerCase().includes(lowercaseQuery),
-					)
-				)
-					return true;
-				return false;
-			});
+		async search(_query: string): Promise<VaultFile[]> {
+			return [];
 		},
 
-		async getRecentFiles(limit = 5): Promise<VaultFile[]> {
-			const allFiles = flattenVaultTree().filter(
-				(f: VaultFile) => f.type === "file",
-			);
-			return allFiles.slice(0, limit);
+		async getRecentFiles(_limit = 5): Promise<VaultFile[]> {
+			return [];
 		},
 
 		async saveFile(path: string, content: string): Promise<boolean> {
@@ -123,14 +97,28 @@ export function createVaultService(opts: { githubSync?: boolean } = {}) {
 
 			const fileName = name.endsWith(".md") ? name : `${name}.md`;
 			const filePath = parentPath ? `${parentPath}/${fileName}` : fileName;
-			const title = name.replace(/\.md$/, "");
-			const content = `# ${title}\n`;
+			const content = `# ${fileName.replace(/\.md$/i, "")}\n`;
 
 			if (useGithubSync) {
-				await createOrUpdateGitHubFile(filePath, content, `Create ${fileName}`);
+				const existing = await getGitHubItem(filePath);
+				if (existing && !Array.isArray(existing)) {
+					throw new VaultPathExistsError(fileName, "file");
+				}
+				try {
+					await createOrUpdateGitHubFile(
+						filePath,
+						content,
+						`Create ${fileName}`,
+					);
+				} catch (err) {
+					if (isGithubPathExistsError(err)) {
+						throw new VaultPathExistsError(fileName, "file");
+					}
+					throw err;
+				}
 			}
 
-			return { path: filePath, name: fileName, title, content, type: "file" };
+			return { path: filePath, name: fileName, title: fileName, content, type: "file" };
 		},
 
 		async createFolder(parentPath: string, name: string): Promise<boolean> {
@@ -139,11 +127,22 @@ export function createVaultService(opts: { githubSync?: boolean } = {}) {
 			const folderPath = parentPath ? `${parentPath}/${name}` : name;
 
 			if (useGithubSync) {
-				await createOrUpdateGitHubFile(
-					`${folderPath}/.gitkeep`,
-					"",
-					`Create folder ${name}`,
-				);
+				const existing = await getGitHubItem(folderPath);
+				if (existing) {
+					throw new VaultPathExistsError(name, "folder");
+				}
+				try {
+					await createOrUpdateGitHubFile(
+						`${folderPath}/.gitkeep`,
+						"",
+						`Create folder ${name}`,
+					);
+				} catch (err) {
+					if (isGithubPathExistsError(err)) {
+						throw new VaultPathExistsError(name, "folder");
+					}
+					throw err;
+				}
 			}
 
 			return true;
@@ -165,7 +164,7 @@ export function createVaultService(opts: { githubSync?: boolean } = {}) {
 			if (!features.editing) throw new Error("Editing is disabled");
 
 			if (useGithubSync) {
-				const treeData = (await getGitHubTree()) as any[];
+				const treeData = normalizeGitTree(await getGitHubTree());
 				const blobs = treeData.filter(
 					(item: any) =>
 						item.type === "blob" && item.path.startsWith(path + "/"),
@@ -198,8 +197,7 @@ export function createVaultService(opts: { githubSync?: boolean } = {}) {
 				await deleteGitHubFile(oldPath, (item as any).sha);
 			}
 
-			const title = fileName.replace(/\.md$/, "");
-			return { path: newPath, name: fileName, title, type: "file" };
+			return { path: newPath, name: fileName, title: fileName, type: "file" };
 		},
 
 		async renameFolder(oldPath: string, newName: string): Promise<boolean> {
@@ -211,7 +209,7 @@ export function createVaultService(opts: { githubSync?: boolean } = {}) {
 			const newPath = parentPath ? `${parentPath}/${newName}` : newName;
 
 			if (useGithubSync) {
-				const treeData = (await getGitHubTree()) as any[];
+				const treeData = normalizeGitTree(await getGitHubTree());
 				const blobs = treeData.filter(
 					(item: any) =>
 						item.type === "blob" && item.path.startsWith(oldPath + "/"),
@@ -265,8 +263,11 @@ export function createVaultService(opts: { githubSync?: boolean } = {}) {
 			const parts = path.split("/");
 			const fileName = parts.pop()!;
 			const parentPath = parts.join("/");
-			const baseName = fileName.replace(/\.md$/, "");
-			const newFileName = `${baseName}-kopie.md`;
+			const dot = fileName.lastIndexOf(".");
+			const newFileName =
+				dot > 0
+					? `${fileName.slice(0, dot)}-kopie${fileName.slice(dot)}`
+					: `${fileName}-kopie.md`;
 			const newPath = parentPath ? `${parentPath}/${newFileName}` : newFileName;
 
 			if (useGithubSync) {
@@ -279,8 +280,7 @@ export function createVaultService(opts: { githubSync?: boolean } = {}) {
 				);
 			}
 
-			const title = `${baseName} (Kopie)`;
-			return { path: newPath, name: newFileName, title, type: "file" };
+			return { path: newPath, name: newFileName, title: newFileName, type: "file" };
 		},
 
 		getBreadcrumbs(path: string) {
@@ -305,16 +305,6 @@ function sortVaultNodes<T extends { type: "file" | "directory"; name: string }>(
 		if (rankDiff !== 0) return rankDiff;
 		return collator.compare(a.name, b.name);
 	});
-}
-
-function convertToTreeNodes(files: VaultFile[]): VaultTreeNode[] {
-	const nodes = files.map((file) => ({
-		path: file.path,
-		name: file.title || file.name,
-		type: file.type,
-		children: file.children ? convertToTreeNodes(file.children) : undefined,
-	}));
-	return sortVaultNodes(nodes);
 }
 
 export function convertGitTreeToNestedNodes(gitData: any[]): VaultTreeNode[] {
@@ -360,5 +350,5 @@ export function convertGitTreeToNestedNodes(gitData: any[]): VaultTreeNode[] {
 	return sortRecursively(root);
 }
 
-export { findVaultFile, getVaultBreadcrumbs, flattenVaultTree };
+export { findVaultFile, getVaultBreadcrumbs, flattenVaultTree } from "@/lib/vault/tree-utils";
 export type { VaultFile, VaultTreeNode };

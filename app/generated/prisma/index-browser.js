@@ -120,6 +120,23 @@ exports.Prisma.TransactionIsolationLevel = makeStrictEnum({
   Serializable: 'Serializable'
 });
 
+exports.Prisma.PlatformSettingsScalarFieldEnum = {
+  id: 'id',
+  usersCanCreateWorkspaces: 'usersCanCreateWorkspaces',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.AppRoleScalarFieldEnum = {
+  id: 'id',
+  key: 'key',
+  label: 'label',
+  description: 'description',
+  permissions: 'permissions',
+  isSystem: 'isSystem',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
 exports.Prisma.UserScalarFieldEnum = {
   id: 'id',
   email: 'email',
@@ -127,17 +144,123 @@ exports.Prisma.UserScalarFieldEnum = {
   name: 'name',
   image: 'image',
   role: 'role',
+  appRoleId: 'appRoleId',
   banned: 'banned',
   banReason: 'banReason',
   banExpires: 'banExpires',
   darkMode: 'darkMode',
-  githubSync: 'githubSync',
   autoSave: 'autoSave',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.WorkspaceScalarFieldEnum = {
+  id: 'id',
+  slug: 'slug',
+  name: 'name',
+  type: 'type',
+  githubSync: 'githubSync',
   vaultGithubOwner: 'vaultGithubOwner',
   vaultGithubRepo: 'vaultGithubRepo',
   vaultGithubBranch: 'vaultGithubBranch',
+  vaultGithubToken: 'vaultGithubToken',
+  lastSyncedSha: 'lastSyncedSha',
+  lastSyncAt: 'lastSyncAt',
+  lastSyncError: 'lastSyncError',
+  initialSyncCompleted: 'initialSyncCompleted',
+  syncLockedUntil: 'syncLockedUntil',
+  mcpEnabled: 'mcpEnabled',
+  mcpApiKeyHash: 'mcpApiKeyHash',
+  mcpApiKeyPrefix: 'mcpApiKeyPrefix',
+  mcpLastUsedAt: 'mcpLastUsedAt',
+  ownerId: 'ownerId',
+  teamId: 'teamId',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
+};
+
+exports.Prisma.WorkspaceMemberScalarFieldEnum = {
+  id: 'id',
+  workspaceId: 'workspaceId',
+  userId: 'userId',
+  role: 'role',
+  joinedAt: 'joinedAt'
+};
+
+exports.Prisma.WorkspaceNavSectionScalarFieldEnum = {
+  id: 'id',
+  workspaceId: 'workspaceId',
+  title: 'title',
+  order: 'order'
+};
+
+exports.Prisma.WorkspacePageScalarFieldEnum = {
+  id: 'id',
+  workspaceId: 'workspaceId',
+  navSectionId: 'navSectionId',
+  templateKey: 'templateKey',
+  slug: 'slug',
+  label: 'label',
+  icon: 'icon',
+  order: 'order',
+  isEnabled: 'isEnabled',
+  config: 'config'
+};
+
+exports.Prisma.WorkspaceFileMirrorScalarFieldEnum = {
+  id: 'id',
+  workspaceId: 'workspaceId',
+  path: 'path',
+  content: 'content',
+  frontmatterJson: 'frontmatterJson',
+  blobSha: 'blobSha',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.UserWorkspacePreferenceScalarFieldEnum = {
+  userId: 'userId',
+  activeWorkspaceId: 'activeWorkspaceId',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.TeamScalarFieldEnum = {
+  id: 'id',
+  slug: 'slug',
+  name: 'name',
+  ownerId: 'ownerId',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.TeamMemberScalarFieldEnum = {
+  id: 'id',
+  teamId: 'teamId',
+  userId: 'userId',
+  role: 'role',
+  joinedAt: 'joinedAt'
+};
+
+exports.Prisma.AppInvitationScalarFieldEnum = {
+  id: 'id',
+  token: 'token',
+  email: 'email',
+  status: 'status',
+  createdById: 'createdById',
+  expiresAt: 'expiresAt',
+  createdAt: 'createdAt'
+};
+
+exports.Prisma.WorkspaceInvitationScalarFieldEnum = {
+  id: 'id',
+  workspaceId: 'workspaceId',
+  token: 'token',
+  email: 'email',
+  role: 'role',
+  allowsSignup: 'allowsSignup',
+  status: 'status',
+  invitedById: 'invitedById',
+  expiresAt: 'expiresAt',
+  createdAt: 'createdAt'
 };
 
 exports.Prisma.SessionScalarFieldEnum = {
@@ -182,6 +305,11 @@ exports.Prisma.SortOrder = {
   desc: 'desc'
 };
 
+exports.Prisma.NullableJsonNullValueInput = {
+  DbNull: Prisma.DbNull,
+  JsonNull: Prisma.JsonNull
+};
+
 exports.Prisma.QueryMode = {
   default: 'default',
   insensitive: 'insensitive'
@@ -192,9 +320,50 @@ exports.Prisma.NullsOrder = {
   last: 'last'
 };
 
+exports.Prisma.JsonNullValueFilter = {
+  DbNull: Prisma.DbNull,
+  JsonNull: Prisma.JsonNull,
+  AnyNull: Prisma.AnyNull
+};
+exports.WorkspaceType = exports.$Enums.WorkspaceType = {
+  PERSONAL: 'PERSONAL',
+  TEAM: 'TEAM'
+};
+
+exports.WorkspaceRole = exports.$Enums.WorkspaceRole = {
+  OWNER: 'OWNER',
+  ADMIN: 'ADMIN',
+  MEMBER: 'MEMBER',
+  VIEWER: 'VIEWER'
+};
+
+exports.TeamRole = exports.$Enums.TeamRole = {
+  OWNER: 'OWNER',
+  ADMIN: 'ADMIN',
+  MEMBER: 'MEMBER'
+};
+
+exports.InvitationStatus = exports.$Enums.InvitationStatus = {
+  PENDING: 'PENDING',
+  ACCEPTED: 'ACCEPTED',
+  DECLINED: 'DECLINED',
+  EXPIRED: 'EXPIRED'
+};
 
 exports.Prisma.ModelName = {
+  PlatformSettings: 'PlatformSettings',
+  AppRole: 'AppRole',
   User: 'User',
+  Workspace: 'Workspace',
+  WorkspaceMember: 'WorkspaceMember',
+  WorkspaceNavSection: 'WorkspaceNavSection',
+  WorkspacePage: 'WorkspacePage',
+  WorkspaceFileMirror: 'WorkspaceFileMirror',
+  UserWorkspacePreference: 'UserWorkspacePreference',
+  Team: 'Team',
+  TeamMember: 'TeamMember',
+  AppInvitation: 'AppInvitation',
+  WorkspaceInvitation: 'WorkspaceInvitation',
   Session: 'Session',
   Account: 'Account',
   Verification: 'Verification'

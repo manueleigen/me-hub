@@ -1,0 +1,3 @@
+.novel-editor ul[data-type="taskList"] li > label input[type="checkbox"] {
+	appearance: revert !important;
+}

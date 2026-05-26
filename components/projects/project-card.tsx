@@ -19,7 +19,10 @@ import {
 	AlertDialogHeader,
 	AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import Link from "next/link";
 import { Pencil, Trash2 } from "lucide-react";
+import { useWorkspace } from "@/lib/workspace-context";
+import { projectDetailPath } from "@/lib/workspace-paths";
 import type { Project } from "@/types/projects";
 
 const TYPE_COLORS: Record<string, string> = {
@@ -42,6 +45,7 @@ interface ProjectCardProps {
 }
 
 export function ProjectCard({ project, onEdit, onDelete }: ProjectCardProps) {
+	const workspaceSlug = useWorkspace()?.workspace.slug;
 	const [confirmOpen, setConfirmOpen] = useState(false);
 	const [deleting, setDeleting] = useState(false);
 
@@ -61,9 +65,12 @@ export function ProjectCard({ project, onEdit, onDelete }: ProjectCardProps) {
 				<CardHeader className="pb-2">
 					<div className="flex items-start justify-between gap-2">
 						<div className="flex-1 min-w-0">
-							<h3 className="font-semibold text-sm leading-tight truncate">
+							<Link
+								href={projectDetailPath(workspaceSlug, project.slug)}
+								className="font-semibold text-sm leading-tight truncate hover:underline block"
+							>
 								{project.title}
-							</h3>
+							</Link>
 							{project.clientName && (
 								<p className="text-xs text-muted-foreground mt-0.5 truncate">
 									{project.clientName}

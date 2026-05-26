@@ -14,7 +14,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import Link from "next/link";
 import { Pencil, Trash2, Mail, Phone } from "lucide-react";
+import { useWorkspace } from "@/lib/workspace-context";
+import { clientDetailPath } from "@/lib/workspace-paths";
 import type { Client } from "@/types/clients";
 
 const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
@@ -60,6 +63,7 @@ interface ClientCardProps {
 }
 
 export function ClientCard({ client, onEdit, onDelete }: ClientCardProps) {
+  const workspaceSlug = useWorkspace()?.workspace.slug;
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const statusCfg = STATUS_CONFIG[client.status] ?? STATUS_CONFIG.inactive;
@@ -82,7 +86,9 @@ export function ClientCard({ client, onEdit, onDelete }: ClientCardProps) {
             <Initials name={client.name} />
             <div className="flex-1 min-w-0">
               <div className="flex items-start justify-between gap-2">
-                <h3 className="font-semibold text-sm leading-tight">{client.name}</h3>
+                <Link href={clientDetailPath(workspaceSlug, client.slug)} className="font-semibold text-sm leading-tight hover:underline">
+                  {client.name}
+                </Link>
                 <Badge className={`text-xs shrink-0 ${statusCfg.className}`}>
                   {statusCfg.label}
                 </Badge>

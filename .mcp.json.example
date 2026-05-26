@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "mehub": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote",
+        "${MEHUB_APP_URL:-http://localhost:3000}/api/mcp/mcp",
+        "--header",
+        "Authorization:${MEHUB_MCP_AUTH}"
+      ],
+      "env": {
+        "MEHUB_MCP_AUTH": "Bearer ${MEHUB_MCP_API_KEY}"
+      }
+    }
+  }
+}

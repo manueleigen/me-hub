@@ -1,13 +1,13 @@
-import { AppHeader } from "@/components/layout/app-header"
-import { DashboardContent } from "@/components/dashboard/dashboard-content"
+import { redirect } from "next/navigation";
+import { getActiveWorkspaceSlug } from "@/app/actions/workspaces";
 
-export default function DashboardPage() {
-  return (
-    <>
-      <AppHeader breadcrumbs={[{ label: "Dashboard" }]} />
-      <div className="flex-1 overflow-auto">
-        <DashboardContent />
-      </div>
-    </>
-  )
+export default async function DashboardRootPage() {
+	const slug = await getActiveWorkspaceSlug();
+
+	if (slug) {
+		redirect(`/w/${slug}`);
+	}
+
+	// No workspace found — user has no memberships (edge case: show a fallback)
+	redirect("/workspaces");
 }

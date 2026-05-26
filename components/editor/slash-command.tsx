@@ -12,6 +12,7 @@ import {
   TextQuote,
   Minus,
 } from "lucide-react"
+import { uploadFn } from "./image-upload"
 
 export const suggestionItems = createSuggestionItems([
   {
@@ -130,19 +131,22 @@ export const suggestionItems = createSuggestionItems([
   },
   {
     title: "Bild",
-    description: "Bild von URL einfuegen.",
+    description: "Bild hochladen oder per URL einfügen.",
     searchTerms: ["photo", "picture", "media", "image"],
     icon: <ImageIcon className="size-4" />,
     command: ({ editor, range }) => {
-      const url = window.prompt("Bild-URL eingeben:")
-      if (url) {
-        editor
-          .chain()
-          .focus()
-          .deleteRange(range)
-          .setImage({ src: url })
-          .run()
+      editor.chain().focus().deleteRange(range).run()
+      const input = document.createElement("input")
+      input.type = "file"
+      input.accept = "image/*"
+      input.onchange = async () => {
+        if (input.files?.length) {
+          const file = input.files[0]
+          const pos = editor.view.state.selection.from
+          uploadFn(file, editor.view, pos)
+        }
       }
+      input.click()
     },
   },
 ])

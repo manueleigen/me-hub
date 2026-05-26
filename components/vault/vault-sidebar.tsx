@@ -2,13 +2,11 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import {
 	Search,
 	FolderPlus,
 	FilePlus,
-	Check,
-	X,
 	ChevronRight,
 	FolderOpen,
 } from "lucide-react";
@@ -17,94 +15,30 @@ import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { VaultTree } from "./vault-tree";
+import {
+	VaultTree,
+	VaultTreeCreateMenuItems,
+	type VaultPendingCreate,
+} from "./vault-tree";
+import { VaultPointerMenu } from "./vault-pointer-menu";
+import { VaultFolderContextMenu } from "./vault-folder-context-menu";
 import type { VaultTreeNode } from "@/types/vault";
 import { createVaultFile, createVaultFolder } from "@/app/actions/vault";
 import { useSync } from "@/lib/vault/sync-context";
+import { vaultTreeReducer } from "./vault-tree-actions";
+import {
+	useVaultTreeSelection,
+	resolveCreateParentPath,
+	resolveCreateParentFromClick,
+} from "./vault-tree-selection";
+import { useRevalidatePage } from "@/hooks/use-revalidate-page";
+import { useVaultBasePath } from "@/hooks/use-vault-base-path";
+import { useVaultWriteEnabled } from "@/lib/vault-link-context";
 import {
 	Collapsible,
 	CollapsibleContent,
 	CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-
-// ── Tree manipulation helpers ─────────────────────────────────────────────────
-
-export type TreeAction =
-	| { type: "add"; parentPath: string; node: VaultTreeNode }
-	| { type: "delete"; path: string }
-	| { type: "rename"; oldPath: string; newName: string }
-	| { type: "move"; sourcePath: string; targetDirPath: string };
-
-function findNode(nodes: VaultTreeNode[], path: string): VaultTreeNode | null {
-	for (const node of nodes) {
-		if (node.path === path) return node;
-		if (node.children) {
-			const found = findNode(node.children, path);
-			if (found) return found;
-		}
-	}
-	return null;
-}
-
-function removeNode(nodes: VaultTreeNode[], path: string): VaultTreeNode[] {
-	return nodes.reduce<VaultTreeNode[]>((acc, node) => {
-		if (node.path === path) return acc;
-		if (node.children) {
-			acc.push({ ...node, children: removeNode(node.children, path) });
-		} else {
-			acc.push(node);
-		}
-		return acc;
-	}, []);
-}
-
-function renameNode(nodes: VaultTreeNode[], oldPath: string, newName: string): VaultTreeNode[] {
-	return nodes.map((node) => {
-		if (node.path === oldPath) {
-			const parentDir = oldPath.includes("/") ? oldPath.split("/").slice(0, -1).join("/") : "";
-			const ext = node.type === "file" && !newName.includes(".") ? ".md" : "";
-			const newFileName = `${newName}${ext}`;
-			const newPath = parentDir ? `${parentDir}/${newFileName}` : newFileName;
-			return { ...node, name: newFileName, path: newPath };
-		}
-		if (node.children) {
-			return { ...node, children: renameNode(node.children, oldPath, newName) };
-		}
-		return node;
-	});
-}
-
-function addNode(nodes: VaultTreeNode[], parentPath: string, newNode: VaultTreeNode): VaultTreeNode[] {
-	if (!parentPath) return [...nodes, newNode];
-	return nodes.map((node) => {
-		if (node.path === parentPath && node.type === "directory") {
-			return { ...node, children: [...(node.children ?? []), newNode] };
-		}
-		if (node.children) {
-			return { ...node, children: addNode(node.children, parentPath, newNode) };
-		}
-		return node;
-	});
-}
-
-function moveNode(nodes: VaultTreeNode[], sourcePath: string, targetDirPath: string): VaultTreeNode[] {
-	const source = findNode(nodes, sourcePath);
-	if (!source) return nodes;
-	const newPath = targetDirPath ? `${targetDirPath}/${source.name}` : source.name;
-	const moved = { ...source, path: newPath };
-	return addNode(removeNode(nodes, sourcePath), targetDirPath, moved);
-}
-
-export function treeReducer(state: VaultTreeNode[], action: TreeAction): VaultTreeNode[] {
-	switch (action.type) {
-		case "add": return addNode(state, action.parentPath, action.node);
-		case "delete": return removeNode(state, action.path);
-		case "rename": return renameNode(state, action.oldPath, action.newName);
-		case "move": return moveNode(state, action.sourcePath, action.targetDirPath);
-	}
-}
-
-// ── Constants ─────────────────────────────────────────────────────────────────
 
 const MIN_WIDTH = 180;
 const MAX_WIDTH = 520;
@@ -117,24 +51,23 @@ interface VaultSidebarProps {
 }
 
 export function VaultSidebar({ tree, gitHubBase = "" }: VaultSidebarProps) {
+	const vaultWriteEnabled = useVaultWriteEnabled();
 	const pathname = usePathname();
-	const router = useRouter();
+	const vaultBase = useVaultBasePath();
+	const revalidate = useRevalidatePage();
 	const { startSync, endSync } = useSync();
 	const [, startTransition] = React.useTransition();
 	const [realTree, setRealTree] = React.useState(tree);
-	const [optimisticTree, treeDispatch] = React.useOptimistic(realTree, treeReducer);
+	const [optimisticTree, treeDispatch] = React.useOptimistic(realTree, vaultTreeReducer);
 	const [searchQuery, setSearchQuery] = React.useState("");
-	const [creating, setCreating] = React.useState<"file" | "folder" | null>(null);
-	const [newName, setNewName] = React.useState("");
-	const [isLoading, setIsLoading] = React.useState(false);
-	const inputRef = React.useRef<HTMLInputElement>(null);
+	const [pendingCreate, setPendingCreate] =
+		React.useState<VaultPendingCreate | null>(null);
+	const [isCreating, setIsCreating] = React.useState(false);
 
-	// Sync real tree when server delivers fresh props
 	React.useEffect(() => {
 		startTransition(() => setRealTree(tree));
 	}, [tree]);
 
-	// ── Resizable width ───────────────────────────────────────────────────
 	const [width, setWidth] = React.useState(DEFAULT_WIDTH);
 	const widthRef = React.useRef(DEFAULT_WIDTH);
 
@@ -171,12 +104,6 @@ export function VaultSidebar({ tree, gitHubBase = "" }: VaultSidebarProps) {
 		document.addEventListener("mouseup", onUp);
 	};
 
-	// ── Focus input when create mode activates ────────────────────────────
-	React.useEffect(() => {
-		if (creating) requestAnimationFrame(() => inputRef.current?.focus());
-	}, [creating]);
-
-	// ── Filtered tree from optimistic state ───────────────────────────────
 	const filteredTree = React.useMemo(() => {
 		if (!searchQuery.trim()) return optimisticTree;
 		const filterNodes = (nodes: VaultTreeNode[]): VaultTreeNode[] =>
@@ -198,61 +125,134 @@ export function VaultSidebar({ tree, gitHubBase = "" }: VaultSidebarProps) {
 		return filterNodes(optimisticTree);
 	}, [optimisticTree, searchQuery]);
 
-	const handleCreate = () => {
-		const name = newName.trim();
-		if (!name || !creating || isLoading) return;
-		const type = creating;
-		setCreating(null);
-		setNewName("");
+	const treeSelection = useVaultTreeSelection(filteredTree);
+	const isVaultRoot = pathname === vaultBase || pathname === `${vaultBase}/`;
+	const [isVaultOpen, setIsVaultOpen] = React.useState(true);
+	const [scrollCreateMenu, setScrollCreateMenu] = React.useState<{
+		parentPath: string;
+		x: number;
+		y: number;
+	} | null>(null);
+
+	const selectionParentPath = React.useMemo(
+		() =>
+			resolveCreateParentPath(
+				treeSelection.selectedPaths,
+				treeSelection.anchorPath,
+				optimisticTree,
+			),
+		[
+			treeSelection.selectedPaths,
+			treeSelection.anchorPath,
+			optimisticTree,
+		],
+	);
+
+	const handleScrollViewportContextMenu = (
+		e: React.MouseEvent<HTMLDivElement>,
+	) => {
+		if (
+			(e.target as Element).closest(
+				"[data-vault-tree-item], [data-vault-folder-item]",
+			)
+		) {
+			return;
+		}
+		e.preventDefault();
+		const parent =
+			resolveCreateParentFromClick(e.target, selectionParentPath) ??
+			selectionParentPath;
+		setScrollCreateMenu({
+			parentPath: parent,
+			x: e.clientX,
+			y: e.clientY,
+		});
+	};
+
+	const startInlineCreateAt = React.useCallback(
+		(type: "file" | "folder", parentPath: string) => {
+			if (pendingCreate || isCreating || !vaultWriteEnabled) return;
+			setPendingCreate({ type, parentPath });
+			setIsVaultOpen(true);
+		},
+		[pendingCreate, isCreating, vaultWriteEnabled],
+	);
+
+	const startInlineCreate = (type: "file" | "folder") => {
+		startInlineCreateAt(
+			type,
+			resolveCreateParentPath(
+				treeSelection.selectedPaths,
+				treeSelection.anchorPath,
+				optimisticTree,
+			),
+		);
+	};
+
+	const handleCreateCommit = async (name: string): Promise<boolean> => {
+		if (!pendingCreate || isCreating) return false;
+		const type = pendingCreate.type;
+		const parentPath = pendingCreate.parentPath;
+
+		const fileName =
+			type === "file" && !name.includes(".") ? `${name}.md` : name;
+		const nodeName = type === "file" ? fileName : name;
+		const nodePath = parentPath ? `${parentPath}/${nodeName}` : nodeName;
 
 		const tempNode: VaultTreeNode = {
-			path: name.includes(".") ? name : type === "file" ? `${name}.md` : name,
-			name: type === "file" && !name.includes(".") ? `${name}.md` : name,
+			path: nodePath,
+			name: nodeName,
 			type: type === "file" ? "file" : "directory",
 			children: type === "folder" ? [] : undefined,
 		};
 
-		setIsLoading(true);
+		setIsCreating(true);
 		startSync();
-		startTransition(async () => {
-			treeDispatch({ type: "add", parentPath: "", node: tempNode });
-			try {
-				await (type === "file" ? createVaultFile("", name) : createVaultFolder("", name));
-				toast.success(type === "file" ? `Datei "${name}" erstellt` : `Ordner "${name}" erstellt`);
-				startTransition(() => router.refresh());
-			} catch {
-				toast.error("Fehler beim Erstellen");
-				startTransition(() => router.refresh());
-			} finally {
-				setIsLoading(false);
-				endSync();
-			}
-		});
-	};
-
-	const handleKeyDown = (e: React.KeyboardEvent) => {
-		if (e.key === "Enter") handleCreate();
-		if (e.key === "Escape") {
-			setCreating(null);
-			setNewName("");
+		try {
+			await (type === "file"
+				? createVaultFile(parentPath, name)
+				: createVaultFolder(parentPath, name));
+			setPendingCreate(null);
+			startTransition(() => {
+				treeDispatch({ type: "add", parentPath, node: tempNode });
+			});
+			toast.success(
+				type === "file"
+					? `Datei „${nodeName}“ erstellt`
+					: `Ordner „${nodeName}“ erstellt`,
+			);
+			treeSelection.selectOnly(nodePath);
+			startTransition(() => revalidate());
+			return true;
+		} catch (err) {
+			const message =
+				err instanceof Error && err.message
+					? err.message
+					: "Fehler beim Erstellen. Bitte erneut versuchen.";
+			toast.error(message);
+			return false;
+		} finally {
+			setIsCreating(false);
+			endSync();
 		}
 	};
 
-	const isVaultRoot = pathname === "/vault";
-	const [isVaultOpen, setIsVaultOpen] = React.useState(true);
+	const handleCreateCancel = () => {
+		if (isCreating) return;
+		setPendingCreate(null);
+	};
 
 	return (
 		<div
-			className="relative border-r flex flex-col bg-muted/30 shrink-0"
+			className="relative flex h-full min-h-0 shrink-0 flex-col overflow-hidden border-r bg-muted/30"
 			style={{ width }}
 		>
-			{/* Header / search / create controls */}
-			<div className="p-3 border-b space-y-3">
+			<div className="space-y-3 border-b p-3">
 				<div className="relative">
 					<Search className="absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
 					<Input
 						placeholder="Suchen..."
-						className="pl-8 h-9"
+						className="h-9 pl-8"
 						value={searchQuery}
 						onChange={(e) => setSearchQuery(e.target.value)}
 					/>
@@ -261,78 +261,81 @@ export function VaultSidebar({ tree, gitHubBase = "" }: VaultSidebarProps) {
 					<Button
 						variant="ghost"
 						size="sm"
-						className="flex-1 h-8 text-xs"
-						onClick={() => {
-							setNewName("");
-							setCreating("folder");
-						}}
+						className="h-8 flex-1 text-xs"
+						disabled={!vaultWriteEnabled || !!pendingCreate}
+						onClick={() => startInlineCreate("folder")}
 					>
-						<FolderPlus className="size-3.5 mr-1" />
+						<FolderPlus className="mr-1 size-3.5" />
 						Ordner
 					</Button>
 					<Button
 						variant="ghost"
 						size="sm"
-						className="flex-1 h-8 text-xs"
-						onClick={() => {
-							setNewName("");
-							setCreating("file");
-						}}
+						className="h-8 flex-1 text-xs"
+						disabled={!vaultWriteEnabled || !!pendingCreate}
+						onClick={() => startInlineCreate("file")}
 					>
-						<FilePlus className="size-3.5 mr-1" />
+						<FilePlus className="mr-1 size-3.5" />
 						Datei
 					</Button>
 				</div>
-
-				{creating && (
-					<div className="flex items-center gap-1">
-						<Input
-							ref={inputRef}
-							placeholder={creating === "file" ? "dateiname.md" : "ordner-name"}
-							className="h-8 text-xs flex-1"
-							value={newName}
-							onChange={(e) => setNewName(e.target.value)}
-							onKeyDown={handleKeyDown}
-							disabled={isLoading}
-						/>
-						<Button
-							variant="ghost"
-							size="icon"
-							className="size-8 shrink-0"
-							onClick={handleCreate}
-							disabled={!newName.trim() || isLoading}
-						>
-							<Check className="size-3.5" />
-						</Button>
-						<Button
-							variant="ghost"
-							size="icon"
-							className="size-8 shrink-0"
-							onClick={() => {
-								setCreating(null);
-								setNewName("");
-							}}
-							disabled={isLoading}
-						>
-							<X className="size-3.5" />
-						</Button>
-					</div>
-				)}
 			</div>
 
-			{/* Tree */}
-			<ScrollArea className="flex-1 " style={{ width: "250" }}>
-				<div className="p-2 tree-view-content" style={{ width: "100%" }}>
+			{scrollCreateMenu && (
+				<VaultPointerMenu
+					open
+					x={scrollCreateMenu.x}
+					y={scrollCreateMenu.y}
+					onOpenChange={(open) => {
+						if (!open) setScrollCreateMenu(null);
+					}}
+				>
+					<VaultTreeCreateMenuItems
+						parentPath={scrollCreateMenu.parentPath}
+						disabled={!vaultWriteEnabled || !!pendingCreate}
+						onStartCreate={(type, parentPath) => {
+							setScrollCreateMenu(null);
+							startInlineCreateAt(type, parentPath);
+						}}
+					/>
+				</VaultPointerMenu>
+			)}
+
+			<ScrollArea
+				className="min-h-0 flex-1"
+				contentMinFullHeight
+				onViewportContextMenu={handleScrollViewportContextMenu}
+			>
+				<div
+					data-vault-tree-scroll
+					className="tree-view-content relative flex min-h-full w-full flex-col p-2"
+					onContextMenu={handleScrollViewportContextMenu}
+				>
+					<div
+						aria-hidden
+						className="absolute inset-0 z-0"
+						onContextMenu={handleScrollViewportContextMenu}
+					/>
+					<div className="relative z-10 min-h-0 flex-1">
 					<Collapsible open={isVaultOpen} onOpenChange={setIsVaultOpen}>
-						<div
+						<VaultFolderContextMenu
+							folder={{ path: "", name: "Vault", children: optimisticTree }}
+							gitHubBase={gitHubBase}
+							isVaultRoot
+							childNodes={optimisticTree}
+							onStartCreate={startInlineCreateAt}
+							vaultWriteEnabled={vaultWriteEnabled}
+							createDisabled={!!pendingCreate || isCreating}
+							treeDispatch={treeDispatch}
 							className={cn(
-								"group flex items-center gap-2 rounded-md px-1 py-0.5 text-sm mb-1",
+								"group mb-1 flex items-center gap-2 rounded-md px-1 py-0.5 text-sm",
 								isVaultRoot && "bg-muted",
 							)}
 						>
 							<CollapsibleTrigger asChild>
 								<button
-									className="shrink-0 p-1.5 rounded hover:bg-muted"
+									type="button"
+									className="shrink-0 rounded p-1.5 hover:bg-muted"
 									onClick={(e) => e.stopPropagation()}
 								>
 									<ChevronRight
@@ -344,28 +347,39 @@ export function VaultSidebar({ tree, gitHubBase = "" }: VaultSidebarProps) {
 								</button>
 							</CollapsibleTrigger>
 							<Link
-								href="/vault"
+								href={vaultBase}
 								className={cn(
-									"flex items-center gap-2 rounded-md py-1.5 pr-2 text-sm font-medium hover:bg-muted transition-colors min-w-0 flex-1",
+									"flex min-w-0 flex-1 items-center gap-2 rounded-md py-1.5 pr-2 text-sm font-medium transition-colors hover:bg-muted",
 									isVaultRoot && "font-semibold",
 								)}
 							>
-								<FolderOpen className="size-4 text-primary shrink-0" />
+								<FolderOpen className="size-4 shrink-0 text-primary" />
 								<span>Vault</span>
 							</Link>
-						</div>
+						</VaultFolderContextMenu>
 						<CollapsibleContent>
 							<div className="pl-2">
-								<VaultTree items={filteredTree} gitHubBase={gitHubBase} treeDispatch={treeDispatch} />
+								<VaultTree
+									items={filteredTree}
+									gitHubBase={gitHubBase}
+									vaultBase={vaultBase}
+									treeDispatch={treeDispatch}
+									selection={treeSelection}
+									pendingCreate={pendingCreate}
+									onCreateCommit={handleCreateCommit}
+									onCreateCancel={handleCreateCancel}
+									onStartCreate={startInlineCreateAt}
+									vaultWriteEnabled={vaultWriteEnabled}
+								/>
 							</div>
 						</CollapsibleContent>
 					</Collapsible>
+					</div>
 				</div>
 			</ScrollArea>
 
-			{/* Resize handle */}
 			<div
-				className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-primary/40 active:bg-primary/60 transition-colors"
+				className="absolute right-0 top-0 h-full w-1 cursor-col-resize transition-colors hover:bg-primary/40 active:bg-primary/60"
 				onMouseDown={handleResizeMouseDown}
 			/>
 		</div>

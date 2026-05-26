@@ -12,27 +12,285 @@ datasource db {
   provider = "postgresql"
 }
 
+// ─── Platform settings ───────────────────────────────────────────────────────
+
+model PlatformSettings {
+  id                       String   @id @default("singleton")
+  usersCanCreateWorkspaces Boolean  @default(false)
+  updatedAt                DateTime @updatedAt
+}
+
+// Configurable platform roles (separate from workspace WorkspaceRole)
+model AppRole {
+  id          String   @id @default(cuid())
+  key         String   @unique // slug, e.g. "user", "admin"
+  label       String
+  description String?
+  permissions String[] // e.g. "platform.admin", "workspace.create"
+  isSystem    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users User[]
+}
+
+// ─── User ─────────────────────────────────────────────────────────────────────
+
 model User {
-  id                String    @id @default(cuid())
-  email             String    @unique
-  emailVerified     Boolean   @default(false)
-  name              String?
-  image             String?
-  role              String?
-  banned            Boolean?
-  banReason         String?
-  banExpires        DateTime?
-  darkMode          Boolean   @default(true)
-  githubSync        Boolean   @default(false)
-  autoSave          Boolean   @default(true)
+  id            String    @id @default(cuid())
+  email         String    @unique
+  emailVerified Boolean   @default(false)
+  name          String?
+  image         String?
+  role          String? // Better Auth admin plugin: "admin" | "user"
+  appRoleId     String?
+  appRole       AppRole?  @relation(fields: [appRoleId], references: [id], onDelete: SetNull)
+  banned        Boolean?
+  banReason     String?
+  banExpires    DateTime?
+
+  // user-level preferences (not workspace-level)
+  darkMode Boolean @default(true)
+  autoSave Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Better Auth relations
+  sessions Session[]
+  accounts Account[]
+
+  // workspace & team relations
+  ownedWorkspaces          Workspace[]              @relation("OwnedWorkspaces")
+  workspaceMemberships     WorkspaceMember[]
+  ownedTeams               Team[]                   @relation("OwnedTeams")
+  teamMemberships          TeamMember[]
+  sentWorkspaceInvitations WorkspaceInvitation[]    @relation("SentWorkspaceInvitations")
+  createdAppInvitations    AppInvitation[]          @relation("CreatedAppInvitations")
+  workspacePreference      UserWorkspacePreference?
+}
+
+// ─── Workspace ────────────────────────────────────────────────────────────────
+
+model Workspace {
+  id   String        @id @default(cuid())
+  slug String        @unique
+  name String
+  type WorkspaceType @default(PERSONAL)
+
+  // vault / github config (moved from User)
+  githubSync        Boolean @default(false)
   vaultGithubOwner  String?
   vaultGithubRepo   String?
   vaultGithubBranch String?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
-  sessions          Session[]
-  accounts          Account[]
+  /// AES-256-GCM encrypted GitHub PAT — workspace-wide access for all members
+  vaultGithubToken  String? @db.Text
+
+  // sync state (moved from User)
+  lastSyncedSha        String?
+  lastSyncAt           DateTime?
+  lastSyncError        String?   @db.Text
+  initialSyncCompleted Boolean   @default(false)
+  syncLockedUntil      DateTime?
+
+  // MCP (Claude Code, Cursor, etc.) — per-workspace API key
+  mcpEnabled      Boolean   @default(false)
+  mcpApiKeyHash   String?   @unique
+  mcpApiKeyPrefix String? // display hint, e.g. mhub_a1b2c3d4…
+  mcpLastUsedAt   DateTime?
+
+  ownerId String
+  owner   User   @relation("OwnedWorkspaces", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  // linked to a Team for TEAM-type workspaces (nullable for PERSONAL)
+  teamId String? @unique
+  team   Team?   @relation(fields: [teamId], references: [id])
+
+  members     WorkspaceMember[]
+  navSections WorkspaceNavSection[]
+  pages       WorkspacePage[]
+  fileMirrors WorkspaceFileMirror[]
+  invitations WorkspaceInvitation[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ownerId])
+  @@index([slug])
 }
+
+enum WorkspaceType {
+  PERSONAL
+  TEAM
+}
+
+model WorkspaceMember {
+  id          String        @id @default(cuid())
+  workspaceId String
+  workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role        WorkspaceRole @default(MEMBER)
+  joinedAt    DateTime      @default(now())
+
+  @@unique([workspaceId, userId])
+  @@index([workspaceId])
+  @@index([userId])
+}
+
+enum WorkspaceRole {
+  OWNER
+  ADMIN
+  MEMBER
+  VIEWER
+}
+
+model WorkspaceNavSection {
+  id          String    @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  title String? // null = unlabeled sidebar group
+  order Int     @default(0)
+
+  pages WorkspacePage[]
+
+  @@index([workspaceId])
+}
+
+model WorkspacePage {
+  id          String    @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  navSectionId String?
+  navSection   WorkspaceNavSection? @relation(fields: [navSectionId], references: [id], onDelete: SetNull)
+
+  templateKey String // "vault" | "produkt-ideen" | "aufgaben" | "clients" | "projects" | "zeiterfassung"
+  slug        String // URL segment — can be renamed by admin
+  label       String // display name shown in sidebar
+  icon        String? // Lucide icon name override
+  order       Int     @default(0)
+  isEnabled   Boolean @default(true)
+
+  // page-specific config: dataFolder sets which repo folder this page reads from
+  // e.g. { "dataFolder": "clients/" } — set by workspace admin
+  config Json?
+
+  @@unique([workspaceId, slug])
+  @@index([workspaceId])
+  @@index([navSectionId])
+}
+
+// Replaces VaultFileMirror — scoped to workspace instead of user
+model WorkspaceFileMirror {
+  id          String    @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  path            String
+  content         String   @db.Text
+  frontmatterJson String?  @db.Text
+  blobSha         String?
+  updatedAt       DateTime @updatedAt
+
+  @@unique([workspaceId, path])
+  @@index([workspaceId])
+  @@index([workspaceId, path])
+}
+
+// Remembers the last active workspace per user (used to redirect / → /w/[slug])
+model UserWorkspacePreference {
+  userId            String   @id
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  activeWorkspaceId String?
+  updatedAt         DateTime @updatedAt
+}
+
+// ─── Teams ────────────────────────────────────────────────────────────────────
+
+model Team {
+  id      String @id @default(cuid())
+  slug    String @unique
+  name    String
+  ownerId String
+  owner   User   @relation("OwnedTeams", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  // 1:1 linked workspace (type TEAM)
+  workspace Workspace?
+
+  members TeamMember[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ownerId])
+}
+
+model TeamMember {
+  id       String   @id @default(cuid())
+  teamId   String
+  team     Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  userId   String
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role     TeamRole @default(MEMBER)
+  joinedAt DateTime @default(now())
+
+  @@unique([teamId, userId])
+  @@index([teamId])
+  @@index([userId])
+}
+
+enum TeamRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+// ─── Invitations ─────────────────────────────────────────────────────────────
+
+// Admin-generated token that lets a new user register on the platform
+model AppInvitation {
+  id          String           @id @default(cuid())
+  token       String           @unique @default(cuid())
+  email       String? // optional — pre-fills the registration form
+  status      InvitationStatus @default(PENDING)
+  createdById String
+  createdBy   User             @relation("CreatedAppInvitations", fields: [createdById], references: [id])
+  expiresAt   DateTime
+  createdAt   DateTime         @default(now())
+
+  @@index([token])
+  @@index([createdById])
+}
+
+// Workspace OWNER/ADMIN invite links — existing users and/or new signups (see allowsSignup)
+model WorkspaceInvitation {
+  id           String           @id @default(cuid())
+  workspaceId  String
+  workspace    Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  token        String           @unique @default(cuid())
+  email        String? // optional display
+  role         WorkspaceRole    @default(MEMBER)
+  allowsSignup Boolean          @default(false) // true: new GitHub users may register via this link
+  status       InvitationStatus @default(PENDING)
+  invitedById  String
+  invitedBy    User             @relation("SentWorkspaceInvitations", fields: [invitedById], references: [id])
+  expiresAt    DateTime
+  createdAt    DateTime         @default(now())
+
+  @@index([workspaceId])
+  @@index([token])
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  EXPIRED
+}
+
+// ─── Better Auth (unchanged) ──────────────────────────────────────────────────
 
 model Session {
   id             String   @id @default(cuid())

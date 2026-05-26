@@ -1,11 +1,17 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-const PUBLIC_PATHS = ['/login', '/register', '/forgot-password'];
+const PUBLIC_PATHS = ['/login', '/register', '/workspace-invite'];
 
 export function middleware(request: NextRequest) {
 	const { pathname } = request.nextUrl;
-	const isPublic = PUBLIC_PATHS.some((p) => pathname.startsWith(p));
+
+	// MCP clients (mcp-remote) probe OAuth metadata — must not redirect to /login HTML
+	if (pathname.startsWith("/.well-known/")) {
+		return NextResponse.next();
+	}
+
+	const isPublic = PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + '/'));
 
 	const sessionToken =
 		request.cookies.get('better-auth.session_token') ??
@@ -17,11 +23,17 @@ export function middleware(request: NextRequest) {
 		return NextResponse.redirect(loginUrl);
 	}
 
-	if (sessionToken && isPublic) {
+	// Allow invite flows while logged in (accept workspace) or during OAuth callback
+	const isInviteFlow =
+		pathname.startsWith('/workspace-invite/') || pathname.startsWith('/register');
+
+	if (sessionToken && isPublic && !isInviteFlow) {
 		return NextResponse.redirect(new URL('/', request.url));
 	}
 
-	return NextResponse.next();
+	const requestHeaders = new Headers(request.headers);
+	requestHeaders.set('x-pathname', pathname);
+	return NextResponse.next({ request: { headers: requestHeaders } });
 }
 
 export const config = {

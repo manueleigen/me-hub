@@ -2,15 +2,12 @@
 
 import * as React from "react";
 import { useTheme } from "next-themes";
-import { getUserSettings, updateUserSettings } from "@/app/actions/settings";
+import { updateUserSettings } from "@/app/actions/settings";
+import type { VaultUserSettings } from "@/lib/cache/server";
 
 interface Settings {
 	darkMode: boolean;
-	githubSync: boolean;
 	autoSave: boolean;
-	vaultGithubOwner: string;
-	vaultGithubRepo: string;
-	vaultGithubBranch: string;
 }
 
 interface SettingsContextType {
@@ -21,11 +18,7 @@ interface SettingsContextType {
 
 const defaultSettings: Settings = {
 	darkMode: true,
-	githubSync: false,
 	autoSave: true,
-	vaultGithubOwner: "",
-	vaultGithubRepo: "",
-	vaultGithubBranch: "",
 };
 
 const SettingsContext = React.createContext<SettingsContextType>({
@@ -34,28 +27,32 @@ const SettingsContext = React.createContext<SettingsContextType>({
 	isLoading: true,
 });
 
-export function SettingsProvider({ children }: { children: React.ReactNode }) {
-	const [settings, setSettings] = React.useState<Settings>(defaultSettings);
-	const [isLoading, setIsLoading] = React.useState(true);
+function toSettings(s: VaultUserSettings): Settings {
+	return {
+		darkMode: s.darkMode,
+		autoSave: s.autoSave,
+	};
+}
+
+export function SettingsProvider({
+	children,
+	initialSettings = null,
+}: {
+	children: React.ReactNode;
+	initialSettings?: VaultUserSettings | null;
+}) {
+	const [settings, setSettings] = React.useState<Settings>(
+		initialSettings ? toSettings(initialSettings) : defaultSettings,
+	);
+	const [isLoading, setIsLoading] = React.useState(!initialSettings);
 	const { setTheme } = useTheme();
 
 	React.useEffect(() => {
-		getUserSettings().then((s) => {
-			if (s) {
-				setSettings({
-					darkMode: s.darkMode,
-					githubSync: s.githubSync,
-					autoSave: s.autoSave,
-					vaultGithubOwner: s.vaultGithubOwner ?? "",
-					vaultGithubRepo: s.vaultGithubRepo ?? "",
-					vaultGithubBranch: s.vaultGithubBranch ?? "",
-				});
-				setTheme(s.darkMode ? "dark" : "light");
-			}
+		if (initialSettings) {
+			setTheme(initialSettings.darkMode ? "dark" : "light");
 			setIsLoading(false);
-		});
-	// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, []);
+		}
+	}, [initialSettings, setTheme]);
 
 	const updateSetting = async <K extends keyof Settings>(key: K, value: Settings[K]) => {
 		const next = { ...settings, [key]: value };

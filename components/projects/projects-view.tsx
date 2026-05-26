@@ -1,100 +1,109 @@
 "use client";
 
-import { useState, useTransition, useOptimistic, useEffect } from "react";
-import { Plus, FolderOpen } from "lucide-react";
-import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ProjectCard } from "./project-card";
-import { ProjectDialog } from "./project-dialog";
+import { useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { listClients } from "@/app/actions/clients";
+import { isDraftSlug } from "@/lib/detail-drawer/constants";
+import { CatalogListPage } from "@/components/entity/catalog-list-page";
+import { useCatalogListState } from "@/components/entity/use-catalog-list-state";
+import { ProjectCard } from "@/components/projects/project-card";
+import {
+	ProjectDetailView,
+	createDraftProject,
+} from "@/components/projects/project-detail-view";
 import {
 	saveProject,
 	deleteProject,
 	ensureSkillFiles,
 } from "@/app/actions/projects";
-import { listClients } from "@/app/actions/clients";
+import {
+	projectFilterTabs,
+	projectListLabels,
+	projectMatchesFilter,
+	projectMatchesSearch,
+} from "@/lib/entity/modules/projects";
 import type { Project, ProjectFrontmatter } from "@/types/projects";
 import type { Client } from "@/types/clients";
-import { AppHeader } from "../layout/app-header";
-
-type FilterType = "all" | "freelance" | "job" | "personal";
-
-type ProjectAction =
-	| { type: "add"; payload: Project }
-	| { type: "update"; payload: Project }
-	| { type: "delete"; slug: string };
-
-function projectReducer(state: Project[], action: ProjectAction): Project[] {
-	switch (action.type) {
-		case "add":
-			return [...state, action.payload];
-		case "update":
-			return state.map((p) =>
-				p.slug === action.payload.slug ? action.payload : p,
-			);
-		case "delete":
-			return state.filter((p) => p.slug !== action.slug);
-	}
-}
-
-interface ProjectsViewProps {
-	projects: Project[];
-	clients: Client[];
-}
 
 export function ProjectsView({
 	projects: initialProjects,
 	clients: initialClients,
-}: ProjectsViewProps) {
-	const [isPending, startTransition] = useTransition();
-	const [realProjects, setRealProjects] = useState(initialProjects);
-	const [optimisticProjects, dispatch] = useOptimistic(
-		realProjects,
-		projectReducer,
-	);
-	const [search, setSearch] = useState("");
-	const [filter, setFilter] = useState<FilterType>("all");
-	const [dialogOpen, setDialogOpen] = useState(false);
-	const [editTarget, setEditTarget] = useState<Project | undefined>();
-	const [clients, setClients] = useState<Client[]>(initialClients);
+}: {
+	projects: Project[];
+	clients: Client[];
+}) {
+	const searchParams = useSearchParams();
+	const clientSlugFromUrl = searchParams.get("client");
+	const [filter, setFilter] = useState("all");
+	const [clients, setClients] = useState(initialClients);
 
-	useEffect(() => {
-		startTransition(() => setRealProjects(initialProjects));
-	}, [initialProjects]);
+	const listState = useCatalogListState<Project>({
+		initialItems: initialProjects,
+		getItemKey: (p) => p.slug,
+		getItemSha: (p) => p.sha,
+		shouldSyncDetailTarget: (current, next) =>
+			!current || current.slug === next.slug || isDraftSlug(current.slug),
+		upsertItems: (items, optimistic, isUpdate) =>
+			isUpdate
+				? items.map((p) => (p.slug === optimistic.slug ? optimistic : p))
+				: [...items, optimistic],
+		findPreviousItem: (items, key) => items.find((p) => p.slug === key),
+		persistItem: async (optimistic, sha) => {
+			const data: ProjectFrontmatter = {
+				type: optimistic.type,
+				title: optimistic.title,
+				client: optimistic.client,
+				clientName: optimistic.clientName,
+				category: optimistic.category,
+				skills: optimistic.skills,
+				tools: optimistic.tools,
+				area: optimistic.area,
+				status: optimistic.status,
+				date: optimistic.date,
+			};
+			await saveProject(optimistic.slug, data, optimistic.body, sha);
+			await ensureSkillFiles(data);
+		},
+		deleteItem: (project) => deleteProject(project.slug, project.sha!),
+		deleteConfirmMessage: projectListLabels.deleteConfirm,
+	});
 
-	const handleDialogOpen = async (open: boolean) => {
-		setDialogOpen(open);
-		if (open) {
-			try {
-				const fresh = await listClients();
-				setClients(fresh);
-			} catch {
-				// keep existing list on error
-			}
+	const refreshClients = async () => {
+		try {
+			setClients(await listClients());
+		} catch {
+			// keep existing list
 		}
 	};
 
-	const filtered = optimisticProjects.filter((p) => {
-		const matchesType = filter === "all" || p.type === filter;
-		const q = search.toLowerCase();
-		const matchesSearch =
-			!q ||
-			p.title.toLowerCase().includes(q) ||
-			(p.clientName?.toLowerCase().includes(q) ?? false) ||
-			p.category.some((c) => c.toLowerCase().includes(q)) ||
-			p.tools.some((t) => t.toLowerCase().includes(q));
-		return matchesType && matchesSearch;
-	});
+	const filteredClient = useMemo(
+		() =>
+			clientSlugFromUrl
+				? clients.find((c) => c.slug === clientSlugFromUrl)
+				: undefined,
+		[clients, clientSlugFromUrl],
+	);
+
+	const listItems = useMemo(() => {
+		if (!clientSlugFromUrl) return listState.items;
+		return listState.items.filter((p) => p.client === clientSlugFromUrl);
+	}, [listState.items, clientSlugFromUrl]);
 
 	const openCreate = () => {
-		setEditTarget(undefined);
-		handleDialogOpen(true);
+		const draft = createDraftProject();
+		if (clientSlugFromUrl && filteredClient) {
+			draft.client = clientSlugFromUrl;
+			draft.clientName = filteredClient.name;
+		}
+		listState.setDetailTarget(draft);
+		void refreshClients();
+		listState.setDetailOpen(true);
 	};
 
 	const openEdit = (project: Project) => {
-		setEditTarget(project);
-		handleDialogOpen(true);
+		listState.setDetailTarget(project);
+		void refreshClients();
+		listState.setDetailOpen(true);
 	};
 
 	const handleSave = async (
@@ -103,7 +112,7 @@ export function ProjectsView({
 		body: string,
 		sha?: string,
 	) => {
-		const optimisticProject: Project = {
+		const optimistic: Project = {
 			slug,
 			sha,
 			body,
@@ -118,120 +127,51 @@ export function ProjectsView({
 			status: data.status,
 			date: data.date,
 		};
-		startTransition(async () => {
-			dispatch(
-				sha
-					? { type: "update", payload: optimisticProject }
-					: { type: "add", payload: optimisticProject },
-			);
-			try {
-				await saveProject(slug, data, body, sha);
-				await ensureSkillFiles(data);
-				startTransition(() => {
-					setRealProjects((prev) =>
-						sha
-							? prev.map((p) => (p.slug === slug ? optimisticProject : p))
-							: [...prev, optimisticProject],
-					);
-				});
-			} catch {
-				toast.error("Fehler beim Speichern");
-			}
-		});
-	};
-
-	const handleDelete = (project: Project) => {
-		if (!project.sha) return;
-		startTransition(async () => {
-			dispatch({ type: "delete", slug: project.slug });
-			try {
-				await deleteProject(project.slug, project.sha!);
-				startTransition(() => {
-					setRealProjects((prev) =>
-						prev.filter((p) => p.slug !== project.slug),
-					);
-				});
-			} catch {
-				toast.error("Fehler beim Löschen");
-			}
-		});
+		await listState.persistWithOptimistic(optimistic, sha);
 	};
 
 	return (
-		<>
-			<AppHeader breadcrumbs={[{ label: "Projekte" }]} />
-			<div className="flex flex-col gap-6 p-6">
-				<div className="flex items-center justify-between">
-					<div>
-						<h1 className="text-2xl font-bold">Projekte</h1>
-						<p className="text-sm text-muted-foreground">
-							{optimisticProjects.length}{" "}
-							{optimisticProjects.length === 1 ? "Projekt" : "Projekte"}
-						</p>
-					</div>
-					<Button onClick={openCreate} disabled={isPending}>
-						<Plus className="size-4 mr-2" />
-						Neues Projekt
-					</Button>
-				</div>
-
-				<div className="flex flex-col sm:flex-row gap-3">
-					<Input
-						placeholder="Projekte durchsuchen…"
-						value={search}
-						onChange={(e) => setSearch(e.target.value)}
-						className="max-w-xs"
-					/>
-					<Tabs
-						value={filter}
-						onValueChange={(v) => setFilter(v as FilterType)}
-					>
-						<TabsList>
-							<TabsTrigger value="all">Alle</TabsTrigger>
-							<TabsTrigger value="freelance">Freelance</TabsTrigger>
-							<TabsTrigger value="job">Job</TabsTrigger>
-							<TabsTrigger value="personal">Persönlich</TabsTrigger>
-						</TabsList>
-					</Tabs>
-				</div>
-
-				{filtered.length === 0 ? (
-					<div className="flex flex-col items-center justify-center py-20 text-center">
-						<FolderOpen className="size-12 text-muted-foreground mb-4" />
-						<h3 className="font-semibold text-lg">Keine Projekte</h3>
-						<p className="text-muted-foreground text-sm mt-1">
-							{search || filter !== "all"
-								? "Keine Projekte gefunden. Filter anpassen?"
-								: "Erstelle dein erstes Projekt."}
-						</p>
-						{!search && filter === "all" && (
-							<Button className="mt-4" onClick={openCreate}>
-								<Plus className="size-4 mr-2" />
-								Erstes Projekt anlegen
-							</Button>
-						)}
-					</div>
-				) : (
-					<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-						{filtered.map((project) => (
-							<ProjectCard
-								key={project.slug}
-								project={project}
-								onEdit={openEdit}
-								onDelete={handleDelete}
-							/>
-						))}
-					</div>
-				)}
-
-				<ProjectDialog
-					open={dialogOpen}
-					onOpenChange={handleDialogOpen}
-					project={editTarget}
+		<CatalogListPage
+			labels={
+				filteredClient
+					? {
+							...projectListLabels,
+							title: `Projekte · ${filteredClient.name}`,
+							countLabel: (count) =>
+								`${count} ${count === 1 ? "Projekt" : "Projekte"} für ${filteredClient.name}`,
+						}
+					: projectListLabels
+			}
+			items={listItems}
+			isRefreshing={listState.isRefreshing}
+			filterTabs={projectFilterTabs}
+			filterValue={filter}
+			onFilterChange={setFilter}
+			matchFilter={(project, f) => projectMatchesFilter(project, f)}
+			matchSearch={projectMatchesSearch}
+			onCreate={openCreate}
+			renderCard={(project) => (
+				<ProjectCard
+					key={project.slug}
+					project={project}
+					onEdit={() => openEdit(project)}
+					onDelete={() => listState.handleDelete(project)}
+				/>
+			)}
+			detailOpen={listState.detailOpen}
+			onDetailOpenChange={(open) => {
+				listState.setDetailOpen(open);
+				if (open) void refreshClients();
+			}}
+			renderEditDrawer={({ open, onOpenChange }) => (
+				<ProjectDetailView
+					open={open}
+					onOpenChange={onOpenChange}
+					project={listState.resolveDetailItem(listState.detailTarget)}
 					clients={clients}
 					onSave={handleSave}
 				/>
-			</div>
-		</>
+			)}
+		/>
 	);
 }

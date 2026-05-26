@@ -1,9 +1,6 @@
 // Feature flags for development
 export const features = {
-	// Authentication - set to true when ready to enable
-	auth: true,
-
-	// GitHub sync - use mock data when false
+	// GitHub-backed vault sync
 	githubSync: true,
 
 	// Allow editing vault files

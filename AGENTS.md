@@ -22,20 +22,70 @@ Every folder is a module. Every module has a consistent frontmatter schema. You 
 
 ## Modules and Vault Paths
 
-| Module              | Path pattern                                       | What lives here                   |
-| ------------------- | -------------------------------------------------- | --------------------------------- |
-| Time tracking       | `zeiterfassung/YYYY-MM/YYYY-MM-DD_projekt-slug.md` | Daily time entries                |
-| Product ideas       | `ideas/products/[slug].md`                         | Structured idea cards             |
-| Profile / career    | `profile/[section]/[slug].md`                      | Work history, skills, services    |
-| Clients             | `clients/[Name]/[slug].md`                         | Client project files              |
-| Content             | `content/[platform]/[slug].md`                     | Platform content drafts           |
-| AI context          | `_context/MANO-CONTEXT.md`                         | Your master background context    |
-| Communication style | `communication/CLAUDE.md`                          | Tone and style for generated text |
-| AI roles            | `ai-roles/README.md`                               | Role definitions for AI personas  |
+| Module              | App route           | Path pattern                                       | What lives here                   |
+| ------------------- | ------------------- | -------------------------------------------------- | --------------------------------- |
+| Tasks               | `/aufgaben`         | `tasks/[slug].md`                                  | Task cards (Kanban)               |
+| Clients             | `/clients`          | `clients/[slug].md` or `clients/[Name]/[slug].md`  | Client records + detail           |
+| Projects            | `/projects`         | `projects/[slug].md`                               | Portfolio project entries         |
+| Time tracking       | `/zeiterfassung`    | `zeiterfassung/YYYY-MM/YYYY-MM-DD_projekt-slug.md` | Daily time entries                |
+| Product ideas       | `/produkt-ideen`    | `ideas/products/[slug].md`                         | Structured idea cards             |
+| Profile / career    | `/profil`           | `profile/[section]/[slug].md`                      | Work history, skills, services    |
+| Content             | —                   | `content/[platform]/[slug].md`                     | Platform content drafts           |
+| AI context          | —                   | `_context/MANO-CONTEXT.md`                         | Your master background context    |
+| Communication style | —                   | `communication/CLAUDE.md`                          | Tone and style for generated text |
+| AI roles            | —                   | `ai-roles/README.md`                               | Role definitions for AI personas  |
+
+> **Note**: `/kunden` is a legacy route backed by the same `clients/` vault folder. Prefer `/clients` for new work.
 
 ---
 
 ## Frontmatter Schemas
+
+### tasks
+
+```yaml
+title: ""
+description: ""
+status: "" # todo | in-progress | done | blocked
+priority: "" # low | medium | high
+project: "" # optional — links to a client/project slug
+dueDate: "" # YYYY-MM-DD
+tags: []
+notes: ""
+createdAt: "YYYY-MM-DD"
+updatedAt: "YYYY-MM-DD"
+```
+
+### clients
+
+```yaml
+name: ""
+type: "" # e.g. "Agentur", "Startup", "Freelancer"
+contact: "" # contact person name
+email: ""
+phone: ""
+website: ""
+address: ""
+hourlyRate: 0 # number, EUR
+status: "" # active | inactive | prospect
+since: "YYYY-MM-DD"
+notes: ""
+```
+
+### projects
+
+```yaml
+type: "" # freelance | job | personal
+title: ""
+client: "" # client slug (optional)
+clientName: "" # display name (optional)
+category: [] # string array
+skills: [] # string array — links to profile/skills
+tools: [] # string array
+area: [] # string array
+status: "" # e.g. active | completed | archived
+date: "YYYY-MM-DD"
+```
 
 ### zeiterfassung
 
@@ -87,28 +137,19 @@ level: "" # expert | advanced | intermediate | beginner
 tags: []
 ```
 
-### clients
-
-```yaml
-client: ""
-project_type: ""
-status: "" # active | completed | paused
-start_date: "YYYY-MM-DD"
-tags: []
-```
-
 ---
 
 ## Rules
 
 1. **Confirm before writing** — before creating or updating any file, show the full content you're about to write and wait for explicit confirmation. No silent writes.
-2. **Use existing client names** — check `clients/` for exact folder names. Never invent a project or client slug.
-3. **Date defaults** — if no date is specified for a time entry, use today's date.
-4. **Required fields first** — if a required field is missing (e.g. `project` for time tracking, `category` for ideas), ask for it before proceeding.
+2. **Use existing client names** — check `clients/` for exact folder names or slugs. Never invent a project or client slug.
+3. **Date defaults** — if no date is specified for a time entry or task, use today's date.
+4. **Required fields first** — if a required field is missing (e.g. `project` for time tracking, `category` for ideas, `status` for tasks), ask for it before proceeding.
 5. **Rate field** — never guess the hourly rate. Ask if not provided.
-6. **Language** — follow the language of the input. German for personal notes, English for code-facing content. Route slugs and file names always stay German (e.g. `zeiterfassung`, `kunden`).
+6. **Language** — follow the language of the input. German for personal notes, English for code-facing content. Route slugs and file names follow their module convention (e.g. `zeiterfassung`, `tasks`, `projects`).
 7. **No invented content** — never fill guessed values. A partial entry is better than a wrong one.
 8. **Tone** — follow `communication/CLAUDE.md`. Professional, direct, no corporate filler.
+9. **Clients path** — the active module is `clients/` (flat `clients/[slug].md` or nested `clients/[Name]/[slug].md`). `/kunden` is a legacy read-only view of the same data.
 
 ---
 
@@ -127,6 +168,8 @@ These tools are provided by the MeHub MCP server:
 | `search(query)`                                          | Full-text search across all modules               |
 | `log_hours(date, project, hours, description)`           | Quick-create a time entry                         |
 | `add_product_idea(title, category, description, status)` | Quick-create a product idea                       |
+| `add_task(title, status, priority, project?)`            | Quick-create a task                               |
+| `add_project(title, type, client?)`                      | Quick-create a portfolio project entry            |
 | `update_profile(section, content)`                       | Update a profile section                          |
 | `add_client(name)`                                       | Create a new client from the template             |
 | `draft_content(platform, topic)`                         | Draft platform content                            |
@@ -146,6 +189,18 @@ Beachte den Kommunikationsstil aus communication/CLAUDE.md.
 
 Verfügbare Module und ihre Vault-Pfade:
 
+## Aufgaben → tasks/[slug].md
+Felder: title, description, status (todo|in-progress|done|blocked),
+        priority (low|medium|high), project, dueDate, tags, notes
+
+## Kunden → clients/[slug].md oder clients/[Name]/[slug].md
+Felder: name, type, contact, email, phone, website, address,
+        hourlyRate, status (active|inactive|prospect), since, notes
+
+## Projekte → projects/[slug].md
+Felder: type (freelance|job|personal), title, client, clientName,
+        category[], skills[], tools[], area[], status, date
+
 ## Zeiterfassung → zeiterfassung/YYYY-MM/YYYY-MM-DD_projekt-slug.md
 Felder: date, project, hours, task, description, billable, rate, tags
 
@@ -157,8 +212,6 @@ Felder: title, category (SaaS|Template|Course|Tool|Other),
 ## Profil/Werdegang → profile/[section]/[slug].md
 Sektionen: about, experience, skills, services, education, career, _output
 
-## Kunden → clients/[Name]/[slug].md
-
 ## Content → content/[platform]/[slug].md
 Plattformen: website, linkedin, malt, social-media
 
@@ -166,9 +219,10 @@ Regeln:
 - Lade MANO-CONTEXT.md am Anfang jeder Session
 - Frage nach fehlenden Pflichtfeldern bevor du schreibst
 - Bestätige jeden Schreibvorgang bevor du ihn ausführst
-- Bei Zeiterfassung: wenn kein Datum angegeben, nutze heute
+- Bei Zeiterfassung/Aufgaben: wenn kein Datum angegeben, nutze heute
 - Nutze den Ton aus communication/CLAUDE.md
 - Beziehe dich auf bestehende Kunden/Projekte (check clients/ folder)
+- /kunden ist ein Legacy-View — für neue Kunden-Einträge clients/ nutzen
 ```
 
 ---

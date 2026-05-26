@@ -1,18 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import {
-	LayoutDashboard,
-	FolderOpen,
-	Clock,
-	Lightbulb,
 	User,
-	FolderKanban,
-	Users,
 	LogOut,
-	Command,
-	Search,
+	Pause,
+	Square,
+	ExternalLink,
+	Settings,
+	ShieldAlert,
 } from "lucide-react";
 
 import {
@@ -37,38 +34,95 @@ import {
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { useUser } from "@/hooks/user";
+import { useDashboardUser } from "@/lib/dashboard-user-context";
+import { useWorkspace } from "@/lib/workspace-context";
+import { zeiterfassungPath } from "@/lib/workspace-paths";
 import { signOut } from "@/lib/auth-client";
+import { useTimerContext } from "@/lib/timer-context";
+import { DonutTimer } from "@/components/zeiterfassung/donut-timer";
+import { WorkspaceSelector } from "@/components/layout/workspace-selector";
+import { WorkspaceNav } from "@/components/layout/workspace-nav";
 import Image from "next/image";
 
-const mainNavItems = [
-	{ title: "Dashboard", href: "/", icon: LayoutDashboard },
-	{ title: "Vault", href: "/vault", icon: FolderOpen },
-];
+function MiniTimerWidget({ workspaceSlug }: { workspaceSlug: string | undefined }) {
+	const { status, hours, minutes, seconds, segments, pause, resume, stop, formData } =
+		useTimerContext();
 
-const ideenNavItems = [
-	{ title: "Produkt-Ideen", href: "/produkt-ideen", icon: Lightbulb },
-];
+	if (status === "idle") return null;
 
-const arbeitNavItems = [
-	{ title: "Kunden", href: "/clients", icon: Users },
-	{ title: "Projekte", href: "/projects", icon: FolderKanban },
-	{ title: "Zeiterfassung", href: "/zeiterfassung", icon: Clock },
-];
+	const isRunning = status === "running";
+	const isPaused = status === "paused";
 
-const einstellungenNavItems = [
-	{ title: "Profil", href: "/profil", icon: User },
-];
+	return (
+		<div className="px-2 py-2 group-data-[collapsible=icon]:px-0">
+			<div className="rounded-lg border bg-card p-2 space-y-2 group-data-[collapsible=icon]:border-0 group-data-[collapsible=icon]:bg-transparent group-data-[collapsible=icon]:p-0">
+				<div className="flex items-center gap-2 group-data-[collapsible=icon]:justify-center">
+					<DonutTimer
+						mini
+						segments={segments}
+						hours={hours}
+						minutes={minutes}
+						seconds={seconds}
+						goalHours={formData.goalHours}
+						isRunning={isRunning}
+						isPaused={isPaused}
+					/>
+					<div className="flex-1 min-w-0 group-data-[collapsible=icon]:hidden">
+						<div className="text-xs font-medium truncate">
+							{formData.projectName || "Aktive Session"}
+						</div>
+						{formData.clientName && (
+							<div className="text-xs text-muted-foreground truncate">
+								{formData.clientName}
+							</div>
+						)}
+					</div>
+				</div>
+
+				<div className="flex items-center gap-1 group-data-[collapsible=icon]:hidden">
+					{isRunning ? (
+						<Button
+							size="sm"
+							variant="outline"
+							className="flex-1 h-7 text-xs border-purple-500/40 hover:bg-purple-500/10 hover:text-purple-400"
+							onClick={pause}
+						>
+							<Pause className="size-3 mr-1" />
+							Pause
+						</Button>
+					) : (
+						<Button
+							size="sm"
+							variant="outline"
+							className="flex-1 h-7 text-xs border-orange-500/40 hover:bg-orange-500/10 hover:text-orange-500"
+							onClick={resume}
+						>
+							Weiter
+						</Button>
+					)}
+					<Button
+						size="sm"
+						variant="outline"
+						className="h-7 w-7 p-0 border-red-500/40 hover:bg-red-500/10 hover:text-red-500"
+						onClick={stop}
+					>
+						<Square className="size-3" />
+					</Button>
+					<Button size="sm" variant="ghost" className="h-7 w-7 p-0" asChild>
+						<Link href={zeiterfassungPath(workspaceSlug)}>
+							<ExternalLink className="size-3" />
+						</Link>
+					</Button>
+				</div>
+			</div>
+		</div>
+	);
+}
 
 export function AppSidebar() {
-	const pathname = usePathname();
 	const router = useRouter();
-	const user = useUser();
-
-	const isActive = (href: string) => {
-		if (href === "/") return pathname === "/";
-		return pathname.startsWith(href);
-	};
+	const user = useDashboardUser();
+	const ctx = useWorkspace();
 
 	const handleSignOut = async () => {
 		await signOut({ fetchOptions: { onSuccess: () => router.push("/login") } });
@@ -76,145 +130,89 @@ export function AppSidebar() {
 
 	return (
 		<Sidebar collapsible="icon">
-			<SidebarHeader>
+			<SidebarHeader className="items-center justify-center gap-1">
 				<SidebarMenu>
 					<SidebarMenuItem>
-						<SidebarMenuButton size="lg" asChild></SidebarMenuButton>
-						<Link href="/" className="grid justify-center text-center">
-							<Image
-								src="/logo_001.png"
-								alt="MeHub Logo"
-								width={150}
-								height={150}
-								style={{ width: "auto" }}
-								loading="eager"
-							/>
-						</Link>
+						<SidebarMenuButton size="lg" asChild tooltip="MeHub">
+							<Link
+								href={ctx ? `/w/${ctx.workspace.slug}` : "/"}
+								className="grid h-full w-full place-items-center text-center"
+							>
+								<Image
+									src="/logo_001.png"
+									alt="MeHub Logo"
+									width={150}
+									height={150}
+									className="h-auto w-full max-w-[140px] group-data-[collapsible=icon]:max-w-8"
+									loading="eager"
+								/>
+							</Link>
+						</SidebarMenuButton>
 					</SidebarMenuItem>
+					{ctx ? (
+						<SidebarMenuItem className="group-data-[collapsible=icon]:hidden">
+							<WorkspaceSelector />
+						</SidebarMenuItem>
+					) : null}
 				</SidebarMenu>
 			</SidebarHeader>
 
 			<SidebarContent>
-				{/* Search not implemented yet
-				<SidebarGroup>
-					<SidebarGroupContent>
-						<SidebarMenu>
-							<SidebarMenuItem>
-								<Button
-									variant="outline"
-									className="w-full justify-start gap-2 text-muted-foreground group-data-[collapsible=icon]:w-8 group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:justify-center"
-								>
-									<Search className="size-4" />
-									<span className="group-data-[collapsible=icon]:hidden">
-										Suchen...
-									</span>
-									<kbd className="pointer-events-none ml-auto hidden h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium opacity-100 sm:flex group-data-[collapsible=icon]:hidden">
-										<span className="text-xs">Ctrl</span>K
-									</kbd>
-								</Button>
-							</SidebarMenuItem>
-						</SidebarMenu>
-					</SidebarGroupContent>
-				</SidebarGroup>
+				{ctx ? (
+					<>
+						<SidebarSeparator />
+						<WorkspaceNav
+							pages={ctx.workspace.pages}
+							navSections={ctx.workspace.navSections}
+							workspaceSlug={ctx.workspace.slug}
+						/>
+						<SidebarSeparator />
+					</>
+				) : null}
 
-				*/}
-				<SidebarSeparator />
-
-				<SidebarGroup>
-					<SidebarGroupContent>
-						<SidebarMenu>
-							{mainNavItems.map((item) => (
-								<SidebarMenuItem key={item.href}>
-									<SidebarMenuButton
-										asChild
-										isActive={isActive(item.href)}
-										tooltip={item.title}
-									>
-										<Link href={item.href}>
-											<item.icon className="size-4" />
-											<span>{item.title}</span>
-										</Link>
-									</SidebarMenuButton>
-								</SidebarMenuItem>
-							))}
-						</SidebarMenu>
-					</SidebarGroupContent>
-				</SidebarGroup>
-
-				<SidebarSeparator />
-
-				<SidebarGroup>
-					<SidebarGroupLabel>Ideen</SidebarGroupLabel>
-					<SidebarGroupContent>
-						<SidebarMenu>
-							{ideenNavItems.map((item) => (
-								<SidebarMenuItem key={item.href}>
-									<SidebarMenuButton
-										asChild
-										isActive={isActive(item.href)}
-										tooltip={item.title}
-									>
-										<Link href={item.href}>
-											<item.icon className="size-4" />
-											<span>{item.title}</span>
-										</Link>
-									</SidebarMenuButton>
-								</SidebarMenuItem>
-							))}
-						</SidebarMenu>
-					</SidebarGroupContent>
-				</SidebarGroup>
-
-				<SidebarSeparator />
-
-				<SidebarGroup>
-					<SidebarGroupLabel>Arbeit</SidebarGroupLabel>
-					<SidebarGroupContent>
-						<SidebarMenu>
-							{arbeitNavItems.map((item) => (
-								<SidebarMenuItem key={item.href}>
-									<SidebarMenuButton
-										asChild
-										isActive={isActive(item.href)}
-										tooltip={item.title}
-									>
-										<Link href={item.href}>
-											<item.icon className="size-4" />
-											<span>{item.title}</span>
-										</Link>
-									</SidebarMenuButton>
-								</SidebarMenuItem>
-							))}
-						</SidebarMenu>
-					</SidebarGroupContent>
-				</SidebarGroup>
-
-				<SidebarSeparator />
-
+				{/* Always-visible settings group */}
 				<SidebarGroup>
 					<SidebarGroupLabel>Einstellungen</SidebarGroupLabel>
 					<SidebarGroupContent>
 						<SidebarMenu>
-							{einstellungenNavItems.map((item) => (
-								<SidebarMenuItem key={item.href}>
-									<SidebarMenuButton
-										asChild
-										isActive={isActive(item.href)}
-										tooltip={item.title}
-									>
-										<Link href={item.href}>
-											<item.icon className="size-4" />
-											<span>{item.title}</span>
+							{ctx && (
+								<>
+									<SidebarMenuItem>
+										<SidebarMenuButton asChild tooltip="Workspace-Einstellungen">
+											<Link href={`/w/${ctx.workspace.slug}/settings/general`} prefetch={false}>
+												<Settings className="size-4" />
+												<span>Workspace</span>
+											</Link>
+										</SidebarMenuButton>
+									</SidebarMenuItem>
+								</>
+							)}
+							<SidebarMenuItem>
+								<SidebarMenuButton asChild tooltip="Profil">
+									<Link href="/profil" prefetch={false}>
+										<User className="size-4" />
+										<span>Profil</span>
+									</Link>
+								</SidebarMenuButton>
+							</SidebarMenuItem>
+							{user?.isPlatformAdmin && (
+								<SidebarMenuItem>
+									<SidebarMenuButton asChild tooltip="Admin">
+										<Link href="/admin/users" prefetch={false}>
+											<ShieldAlert className="size-4" />
+											<span>Admin</span>
 										</Link>
 									</SidebarMenuButton>
 								</SidebarMenuItem>
-							))}
+							)}
 						</SidebarMenu>
 					</SidebarGroupContent>
 				</SidebarGroup>
 			</SidebarContent>
 
 			<SidebarFooter>
+				<MiniTimerWidget workspaceSlug={ctx?.workspace.slug} />
+
 				<SidebarMenu>
 					<SidebarMenuItem>
 						{user && (
@@ -255,7 +253,7 @@ export function AppSidebar() {
 									</DropdownMenuLabel>
 									<DropdownMenuSeparator />
 									<DropdownMenuItem asChild>
-										<Link href="/profil">
+										<Link href="/profil" prefetch={false}>
 											<User className="size-4 mr-2" />
 											Profil
 										</Link>

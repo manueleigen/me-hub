@@ -1,11 +1,21 @@
 "use server";
 
 import {
-  getGitHubItem,
   createOrUpdateGitHubFile,
   deleteGitHubFile,
 } from "@/app/actions/github";
-import { parseFrontmatter, serializeFrontmatter, slugify } from "@/lib/frontmatter";
+import {
+  coerceStringArray,
+  parseFrontmatter,
+  serializeFrontmatter,
+  slugify,
+} from "@/lib/frontmatter";
+import {
+	getListedFileBody,
+	getListedFileFrontmatter,
+} from "@/lib/vault/listed-file";
+import { listMarkdownUnderPrefix } from "@/lib/vault/list-markdown";
+import { vaultModuleEntrySlugFromBasename } from "@/lib/vault/mirrorable-text-files";
 import type { Project, ProjectFrontmatter } from "@/types/projects";
 
 const PROJECTS_FOLDER = "projects";
@@ -17,40 +27,37 @@ const SKILL_FOLDER_MAP: Record<string, string> = {
   area: "profile/skills/area",
 };
 
+export async function getProjectBySlug(slug: string): Promise<Project | null> {
+  const projects = await listProjects();
+  return projects.find((p) => p.slug === slug) ?? null;
+}
+
 export async function listProjects(): Promise<Project[]> {
-  const dir = await getGitHubItem(PROJECTS_FOLDER);
-  if (!dir || !Array.isArray(dir)) return [];
+  const files = await listMarkdownUnderPrefix(PROJECTS_FOLDER);
 
-  const mdFiles = (dir as { name: string; path: string; sha: string; type: string }[]).filter(
-    (f) => f.type === "file" && f.name.endsWith(".md") && !f.name.startsWith("_"),
-  );
-
-  const projects = await Promise.all(
-    mdFiles.map(async (f) => {
-      const file = await getGitHubItem(f.path);
-      if (!file || Array.isArray(file) || !("content" in file)) return null;
-      const { data, content } = parseFrontmatter(file.content as string);
-      const slug = f.name.replace(/\.md$/, "");
+  return files
+    .map((f) => {
+      const slug = vaultModuleEntrySlugFromBasename(f.name);
+      const data = getListedFileFrontmatter(f);
+      const content = getListedFileBody(f);
       const project: Project = {
         slug,
-        sha: (file as { sha?: string }).sha,
+        sha: f.sha,
         body: content,
         type: (data.type as Project["type"]) ?? "personal",
         title: (data.title as string) ?? slug,
         client: data.client as string | undefined,
         clientName: data.clientName as string | undefined,
-        category: (data.category as string[]) ?? [],
-        skills: (data.skills as string[]) ?? [],
-        tools: (data.tools as string[]) ?? [],
-        area: (data.area as string[]) ?? [],
+        category: coerceStringArray(data.category),
+        skills: coerceStringArray(data.skills),
+        tools: coerceStringArray(data.tools),
+        area: coerceStringArray(data.area),
         status: data.status as string | undefined,
         date: data.date as string | undefined,
       };
       return project;
-    }),
-  );
-
-  return projects.filter((p): p is Project => p !== null);
+    })
+    .filter((p): p is Project => p !== null);
 }
 
 export async function saveProject(

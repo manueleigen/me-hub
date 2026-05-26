@@ -1,8 +1,7 @@
 "use client";
 
-import { SyncProvider } from "@/lib/vault/sync-context";
-import { SyncIndicator } from "./sync-indicator";
 import { VaultSidebar } from "./vault-sidebar";
+import { VaultShellProvider } from "./vault-shell-context";
 import type { VaultTreeNode } from "@/types/vault";
 
 interface VaultShellProps {
@@ -11,14 +10,16 @@ interface VaultShellProps {
 	children: React.ReactNode;
 }
 
+/** Vault file tree (inner panel); sync + navigation save live in DashboardShell. */
 export function VaultShell({ tree, gitHubBase, children }: VaultShellProps) {
 	return (
-		<SyncProvider>
-			<div className="flex flex-1 overflow-hidden">
+		<VaultShellProvider gitHubBase={gitHubBase}>
+			<div className="flex min-h-0 flex-1 overflow-hidden">
 				<VaultSidebar tree={tree} gitHubBase={gitHubBase} />
-				<div className="flex-1 flex flex-col overflow-hidden">{children}</div>
+				<div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+					{children}
+				</div>
 			</div>
-			<SyncIndicator />
-		</SyncProvider>
+		</VaultShellProvider>
 	);
 }
