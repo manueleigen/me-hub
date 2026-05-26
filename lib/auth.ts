@@ -10,6 +10,10 @@ import { seedWorkspaceNavAndPages } from "./workspace-seed";
 import type { VaultSessionUser } from "@/types/vault-session-user";
 import { fulfillWorkspaceInvitationForUser } from "@/lib/invitations/fulfill-workspace-invitation";
 import { acceptAppInvitationByToken } from "@/lib/invitations/accept-app-invitation-by-token";
+import {
+	resolveAppInvitationForNewUser,
+	resolveWorkspaceInvitationForNewUser,
+} from "@/lib/invitations/resolve-invitations-for-new-user";
 import { getInviteTokensFromOAuthState } from "./invite-oauth";
 import {
 	ensurePlatformRoles,

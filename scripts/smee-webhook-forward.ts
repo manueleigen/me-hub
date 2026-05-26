@@ -29,13 +29,17 @@ console.info(
 	"[smee] Ensure GITHUB_WEBHOOK_SECRET in .env matches the secret in GitHub → Webhooks",
 );
 
-await smee.start();
+async function main() {
+	await smee.start();
 
-const shutdown = async () => {
-	console.info("[smee] Stopping…");
-	await smee.close();
-	process.exit(0);
-};
+	const shutdown = async () => {
+		console.info("[smee] Stopping…");
+		await smee.stop();
+		process.exit(0);
+	};
 
-process.on("SIGINT", shutdown);
-process.on("SIGTERM", shutdown);
+	process.on("SIGINT", shutdown);
+	process.on("SIGTERM", shutdown);
+}
+
+void main();

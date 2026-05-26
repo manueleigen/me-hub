@@ -135,7 +135,7 @@
 │   ├── vault-session-user.ts
 │   ├── vault.ts
 │   └── zeiterfassung.ts
-├── middleware.ts                 # Auth-gating + x-pathname header injection
+├── proxy.ts                      # Auth-gating + x-pathname header injection
 ├── next.config.mjs
 ├── prisma.config.ts
 ├── tsconfig.json

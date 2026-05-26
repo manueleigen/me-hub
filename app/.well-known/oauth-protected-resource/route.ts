@@ -19,6 +19,6 @@ export async function GET(request: Request) {
 }
 
 export async function OPTIONS(request: Request) {
-	const res = await innerOptions(request);
+	const res = innerOptions();
 	return applyMcpResourceCorsAllowlist(request, res);
 }

@@ -628,15 +628,11 @@ export function WorkspacePagesBoard({
 		if (!over || !canEdit) return;
 		if (!activeId.startsWith("page:")) return;
 
-		let layoutCommit: { next: BoardState; rollback: BoardState } | null = null;
 		setState((prev) => {
 			const next = withSyncedPageSections(prev, prev.pageIdsByContainer);
-			layoutCommit = { next, rollback: prev };
+			commitLayoutToServer(next, prev);
 			return next;
 		});
-		if (layoutCommit) {
-			commitLayoutToServer(layoutCommit.next, layoutCommit.rollback);
-		}
 	};
 
 	const handleDragCancel = () => {
@@ -644,7 +640,6 @@ export function WorkspacePagesBoard({
 	};
 
 	const moveSection = (sectionId: string, direction: -1 | 1) => {
-		let layoutCommit: { next: BoardState; rollback: BoardState } | null = null;
 		setState((prev) => {
 			const index = prev.sectionOrder.indexOf(sectionId);
 			const target = index + direction;
@@ -653,12 +648,9 @@ export function WorkspacePagesBoard({
 				...prev,
 				sectionOrder: arrayMove(prev.sectionOrder, index, target),
 			};
-			layoutCommit = { next, rollback: prev };
+			commitLayoutToServer(next, prev);
 			return next;
 		});
-		if (layoutCommit) {
-			commitLayoutToServer(layoutCommit.next, layoutCommit.rollback);
-		}
 	};
 
 	const debouncedSectionTitlePersist = useDebouncedCallback(

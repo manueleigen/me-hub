@@ -12,6 +12,7 @@ import {
   Tooltip,
   ResponsiveContainer,
   Cell,
+  type BarProps,
 } from "recharts"
 import { Clock, Euro, FolderKanban, Zap, CalendarClock } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -35,7 +36,7 @@ type LayeredBarShapeProps = {
 /** Geplant — breiter, leicht nach links, liegt hinten */
 function PlannedBarShape(props: LayeredBarShapeProps) {
   const { x = 0, y = 0, width = 0, height = 0, fill } = props
-  if (height <= 0) return null
+  if (height <= 0) return <g />
   return (
     <rect
       x={x - BAR_LAYER_OFFSET}
@@ -53,7 +54,7 @@ function PlannedBarShape(props: LayeredBarShapeProps) {
 /** Erfasst — schmaler, leicht nach rechts, liegt vorne */
 function WorkBarShape(props: LayeredBarShapeProps) {
   const { x = 0, y = 0, width = 0, height = 0, fill, opacity = 1 } = props
-  if (height <= 0) return null
+  if (height <= 0) return <g />
   return (
     <rect
       x={x + BAR_LAYER_OFFSET}
@@ -234,9 +235,9 @@ export function TrackerStatistics({
                     dataKey="plannedHours"
                     fill={COLOR_PLANNED}
                     maxBarSize={34}
-                    shape={PlannedBarShape}
+                    shape={PlannedBarShape as BarProps["shape"]}
                   />
-                  <Bar dataKey="hours" maxBarSize={26} shape={WorkBarShape}>
+                  <Bar dataKey="hours" maxBarSize={26} shape={WorkBarShape as BarProps["shape"]}>
                     {stats.weekData.map((entry, i) => (
                       <Cell
                         key={i}
