@@ -1,6 +1,10 @@
 import { cache } from "react";
+import { headers } from "next/headers";
 import { getAuthSession } from "@/lib/auth";
-import { resolveActiveWorkspaceForUser } from "@/app/actions/workspaces";
+import {
+	resolveActiveWorkspaceForUser,
+	resolveWorkspaceForUser,
+} from "@/app/actions/workspaces";
 import { prisma } from "@/lib/prisma";
 import {
 	mapSessionUserToVaultRow,
@@ -73,20 +77,46 @@ export const getCachedUserSettings = cache(async (): Promise<VaultUserSettings |
 	};
 });
 
+function mapWorkspaceToVaultRow(
+	workspace: {
+		id: string;
+		githubSync: boolean;
+		vaultGithubOwner: string | null;
+		vaultGithubRepo: string | null;
+		vaultGithubBranch: string | null;
+		initialSyncCompleted: boolean;
+	},
+): ActiveWorkspaceVault {
+	return {
+		id: workspace.id,
+		githubSync: workspace.githubSync,
+		vaultGithubOwner: workspace.vaultGithubOwner,
+		vaultGithubRepo: workspace.vaultGithubRepo,
+		vaultGithubBranch: workspace.vaultGithubBranch,
+		initialSyncCompleted: workspace.initialSyncCompleted,
+	};
+}
+
+/**
+ * Vault reads/writes for this request use the workspace from `/w/[slug]/…` when
+ * `x-pathname` is set (middleware). Otherwise falls back to the user's active
+ * workspace preference.
+ */
 export const getCachedActiveWorkspaceVault = cache(
 	async (): Promise<ActiveWorkspaceVault | null> => {
+		const pathname = (await headers()).get("x-pathname") ?? "";
+		const slugFromPath = pathname.match(/^\/w\/([^/]+)(?:\/|$)/)?.[1];
+		if (slugFromPath) {
+			const fromUrl = await resolveWorkspaceForUser(slugFromPath);
+			if (fromUrl) {
+				return mapWorkspaceToVaultRow(fromUrl.workspace);
+			}
+		}
+
 		const resolved = await resolveActiveWorkspaceForUser();
 		if (!resolved) return null;
 
-		const { workspace } = resolved;
-		return {
-			id: workspace.id,
-			githubSync: workspace.githubSync,
-			vaultGithubOwner: workspace.vaultGithubOwner,
-			vaultGithubRepo: workspace.vaultGithubRepo,
-			vaultGithubBranch: workspace.vaultGithubBranch,
-			initialSyncCompleted: workspace.initialSyncCompleted,
-		};
+		return mapWorkspaceToVaultRow(resolved.workspace);
 	},
 );
 
@@ -106,7 +136,7 @@ export const getCachedMirrorReadContext = cache(
 	},
 );
 
-/** Repo config from the active workspace. */
+/** Repo config for the vault workspace inferred from `x-pathname` or active preference. */
 export const getCachedVaultConfig = cache(async () => {
 	const workspace = await getCachedActiveWorkspaceVault();
 	const owner = (workspace?.vaultGithubOwner ?? "").trim();
