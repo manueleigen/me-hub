@@ -6,6 +6,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { appConfig } from "@/lib/config";
 import { pageTitleTemplate } from "@/lib/page-metadata";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 
 const fontSans = Geist({ subsets: ["latin"], variable: "--font-sans" });
 const fontMono = Geist_Mono({ subsets: ["latin"], variable: "--font-mono" });
@@ -32,6 +33,7 @@ export default function RootLayout({
 			<body className="antialiased">
 				<ThemeProvider>{children}</ThemeProvider>
 				<Toaster />
+				<SpeedInsights />
 			</body>
 		</html>
 	);

@@ -11,55 +11,78 @@
 │   │   ├── layout.tsx
 │   │   └── login/
 │   ├── (dashboard)/             # Protected routes (auth required)
+│   │   ├── (shell)/             # Non-workspace pages (own sidebar/layout)
+│   │   │   ├── admin/           # Platform admin (users, roles, invitations)
+│   │   │   ├── profil/          # User profile
+│   │   │   ├── workspaces/      # Workspace switcher / list
+│   │   │   └── layout.tsx
+│   │   ├── w/                   # Workspace-scoped routes
+│   │   │   └── [workspaceSlug]/
+│   │   │       ├── aufgaben/    # Task Kanban
+│   │   │       ├── clients/     # Client management + detail pages
+│   │   │       ├── produkt-ideen/
+│   │   │       ├── projects/
+│   │   │       ├── vault/       # Vault file browser + editor
+│   │   │       ├── settings/    # Workspace settings
+│   │   │       │   ├── general/
+│   │   │       │   ├── github/
+│   │   │       │   ├── mcp/     # MCP API key management
+│   │   │       │   ├── members/
+│   │   │       │   ├── pages/
+│   │   │       │   └── users/
+│   │   │       ├── [pageSlug]/  # Dynamic workspace pages
+│   │   │       ├── layout.tsx
+│   │   │       └── page.tsx     # Workspace home
 │   │   ├── template.tsx         # VaultSyncProvider + AppStatusIndicator
-│   │   ├── aufgaben/            # Task management (Kanban)
-│   │   ├── clients/             # Client management + detail pages (/clients/[slug])
-│   │   ├── kunden/              # Legacy client list (kept; superseded by /clients)
-│   │   ├── produkt-ideen/       # Product ideas (Kanban)
-│   │   ├── profil/              # Profile / career + vault settings
-│   │   ├── projects/            # Portfolio projects
+│   │   ├── aufgaben/            # Legacy top-level task route (kept)
+│   │   ├── clients/             # Legacy top-level client route (kept)
+│   │   ├── produkt-ideen/       # Legacy top-level ideas route (kept)
+│   │   ├── projects/            # Legacy top-level projects route (kept)
 │   │   ├── settings/
-│   │   ├── vault/               # Vault file browser
-│   │   ├── zeiterfassung/       # Time tracking (list + manual entry)
-│   │   ├── zeiterfassung2/      # Time tracking v2 (donut timer + sessions UI)
+│   │   ├── vault/               # Legacy top-level vault route (kept)
+│   │   ├── zeiterfassung/
+│   │   ├── zeiterfassung2/
 │   │   ├── layout.tsx           # Dashboard shell (sidebar + header)
 │   │   └── page.tsx             # Dashboard home
 │   ├── actions/                 # Server actions per module
+│   │   ├── admin-roles.ts
+│   │   ├── admin-users.ts
 │   │   ├── aufgaben.ts          # listTasks, saveTask, deleteTask, updateTaskStatus
 │   │   ├── clients.ts           # listClients, saveClient, deleteClient
 │   │   ├── github.ts            # createOrUpdateGitHubFile, deleteGitHubFile
+│   │   ├── invitations.ts
 │   │   ├── produkt-ideen.ts
-│   │   ├── projects.ts          # listProjects, saveProject, deleteProject
+│   │   ├── projects.ts
 │   │   ├── settings.ts
 │   │   ├── setup.ts
 │   │   ├── vault-sync.ts        # checkVaultRemote, executeVaultSync, getVaultSyncSnapshot
 │   │   ├── vault.ts
+│   │   ├── workspace-settings.ts
+│   │   ├── workspace-vault-sync.ts
+│   │   ├── workspaces.ts
 │   │   └── zeiterfassung.ts
 │   ├── api/
 │   │   ├── auth/                # better-auth route handler
+│   │   ├── mcp/[transport]/     # MCP server (streamable HTTP + SSE)
 │   │   └── webhook/github/      # GitHub push → vault mirror sync
 │   └── generated/
 │       └── prisma/              # Auto-generated Prisma client (do not edit)
 ├── components/
-│   ├── aufgaben/                # AufgabenView, TaskDialog, TaskKanbanCard
-│   ├── clients/                 # ClientCard, ClientQuickDetailDrawer, client-detail-view (page)
-│   ├── dashboard/               # Dashboard-specific components
+│   ├── aufgaben/
+│   ├── clients/
+│   ├── dashboard/
 │   ├── editor/                  # Novel editor + Tiptap extensions
-│   ├── kanban-board.tsx         # Generic Kanban board primitive
-│   ├── kunden/                  # Legacy client list components
+│   ├── kanban-board.tsx
 │   ├── layout/                  # App shell, app-status-indicator, operation providers
-│   ├── loading/                 # PageLoadingShell skeleton
-│   ├── produkt-ideen/           # Product idea dialogs
-│   ├── projects/                # ProjectCard, ProjectDialog, ProjectsView
-│   ├── sortable-table.tsx       # Generic sortable table
-│   ├── stats-grid.tsx           # Stats grid layout
-│   ├── tag-input.tsx            # Tag input component
-│   ├── ui/                      # shadcn/ui primitives
-│   ├── vault/                   # Vault viewer, tree, sidebar
-│   └── zeiterfassung/           # Time entry + timer components
+│   ├── loading/
+│   ├── produkt-ideen/
+│   ├── projects/
+│   ├── ui/                      # shadcn/ui primitives (component files only; CSS vendored)
+│   ├── vault/
+│   └── zeiterfassung/
 ├── hooks/
 │   ├── use-mobile.ts
-│   ├── use-revalidate-page.ts   # Triggers router.refresh() + optional sync
+│   ├── use-revalidate-page.ts
 │   ├── use-stale-refresh.ts
 │   ├── use-timer.ts
 │   ├── use-toast.ts
@@ -67,82 +90,81 @@
 ├── lib/
 │   ├── auth.ts                  # Server-side auth (getAuthSession)
 │   ├── auth-client.ts           # Client-side auth (authClient)
+│   ├── background-save.ts
 │   ├── cache/                   # Next.js cache tag helpers
 │   │   ├── server.ts
 │   │   └── vault-tags.ts
-│   ├── clients/                 # Client vault-path resolution + mapping
-│   │   ├── map-client.ts
-│   │   └── vault-paths.ts       # CLIENTS_FOLDER, groupListedFilesByClient, etc.
+│   ├── clients/
 │   ├── config.ts                # Feature flags + app config
 │   ├── dashboard-user-context.tsx
-│   ├── frontmatter.ts           # parseFrontmatter, serializeFrontmatter, slugify
-│   ├── github/                  # GitHub API helpers
-│   │   ├── mirror-context.ts    # getUserVaultRepoConfig
-│   │   ├── octokit.ts           # getOctokitClient, fetchNoStore
+│   ├── entity/                  # Shared entity helpers
+│   ├── frontmatter.ts
+│   ├── github/
+│   │   ├── mirror-context.ts
+│   │   ├── octokit.ts
 │   │   └── token.ts             # getGitHubTokenForWorkspace (PAT → owner OAuth)
-│   ├── kunden/                  # Legacy client types + mock data
+│   ├── invitation-utils.ts
+│   ├── invitations/             # Invitation resolution logic
+│   │   ├── accept-app-invitation-by-token.ts
+│   │   ├── fulfill-workspace-invitation.ts
+│   │   └── resolve-invitations-for-new-user.ts
+│   ├── invite-oauth.ts
+│   ├── mcp/                     # MCP auth helpers
+│   │   ├── api-key.ts
+│   │   ├── auth.ts
+│   │   ├── oauth-resource-cors.ts
+│   │   └── urls.ts
 │   ├── mirror/                  # Postgres mirror reads
-│   │   ├── bulk-read.ts
-│   │   ├── page-loaders.ts      # loadProjectsAndClients, loadClientDetail
-│   │   ├── prisma-capabilities.ts
-│   │   ├── prisma-rows.ts
-│   │   ├── repo-mirror.ts
-│   │   └── sync-fields.ts
-│   ├── mock-data/               # Dev mock data
-│   ├── prisma.ts                # Prisma singleton
-│   ├── produkt-ideen/           # Idea types
+│   ├── page-metadata.ts
+│   ├── platform-admin.ts
+│   ├── platform-permissions.ts  # PlatformPermission type + hasPlatformPermission
+│   ├── platform-roles.ts        # ensurePlatformRoles, getUserPermissionContext, userHasPermission
+│   ├── prisma.ts
+│   ├── rate-limit.ts
+│   ├── security-audit.ts
 │   ├── settings-context.tsx
 │   ├── sync/                    # GitHub sync pipeline
-│   │   ├── branch-tip.ts        # getBranchTipWithTree() — single fetch for commitSha+treeSha
-│   │   ├── bump-sync-pointer.ts # bumpUserLastSyncedSha() — advance pointer after app writes
+│   │   ├── branch-tip.ts
+│   │   ├── bump-sync-pointer.ts
 │   │   ├── check-vault-remote.ts
 │   │   ├── full-import.ts
 │   │   ├── github-webhook.ts
-│   │   ├── graphql-blobs.ts     # Parallel blob fetch (GRAPHQL_CONCURRENCY=3)
-│   │   ├── incremental.ts       # compareCommits delta; reconcileOrphans opt-in
+│   │   ├── graphql-blobs.ts
+│   │   ├── incremental.ts
 │   │   ├── markdown-tree-paths.ts
 │   │   ├── reconcile-orphans.ts
 │   │   ├── sync-log.ts
 │   │   ├── sync-vault-for-user.ts
-│   │   └── types.ts             # SyncResult, SyncVaultOptions, VaultRemoteCheckResult
+│   │   └── types.ts
 │   ├── timer-context.tsx
-│   ├── utils.ts                 # cn() and other shared utils
-│   ├── vault/                   # Vault service, sync context, file helpers
-│   │   ├── config.ts
-│   │   ├── display-name.ts
-│   │   ├── index.ts
-│   │   ├── list-markdown.ts     # listMarkdownUnderPrefix
-│   │   ├── listed-file.ts       # getListedFileFrontmatter, getListedFileBody
-│   │   ├── mirrorable-text-files.ts
-│   │   ├── server.ts
-│   │   ├── sync-context.tsx
-│   │   └── sync-ui-context.tsx  # VaultSyncProvider, tiered client triggers
-│   └── zeiterfassung/           # Time entry helpers
+│   ├── utils.ts
+│   ├── vault/
+│   ├── vault-link-context.tsx
+│   ├── workspace-context.tsx    # WorkspaceData, WorkspacePageData, WorkspaceNavSectionData
+│   ├── workspace-defaults.ts
+│   ├── workspace-page-templates.ts
+│   ├── workspace-paths.ts
+│   ├── workspace-seed.ts
+│   ├── workspace-slug.ts
+│   └── zeiterfassung/
 ├── prisma/
-│   ├── migrations/              # Applied DB migrations
-│   └── schema.prisma            # Source of truth for DB schema
-├── public/                      # Static assets
+│   ├── migrations/
+│   └── schema.prisma
+├── public/
 ├── scripts/
-│   └── smee-webhook-forward.ts  # Local dev: smee.io → localhost webhook
-├── styles/                      # Global CSS (Tailwind base)
+│   └── smee-webhook-forward.ts
+├── styles/
+│   ├── globals.css              # Tailwind base; imports shadcn-tailwind.css
+│   └── shadcn-tailwind.css      # Vendored shadcn animations + custom variants
 ├── types/
-│   ├── aufgaben.ts              # Task, TaskFrontmatter, TaskStatus, TaskPriority
-│   ├── auth.ts / auth-types.ts
-│   ├── clients.ts               # Client, ClientFrontmatter, ClientStatus
-│   ├── kunden.ts                # Legacy
-│   ├── produkt-ideen.ts
-│   ├── projects.ts              # Project, ProjectFrontmatter, ProjectType
-│   ├── vault-session-user.ts
-│   ├── vault.ts
-│   └── zeiterfassung.ts
-├── proxy.ts                      # Auth-gating + x-pathname header injection
+├── proxy.ts                     # Auth-gating + x-pathname header injection (Next.js middleware)
 ├── next.config.mjs
 ├── prisma.config.ts
 ├── tsconfig.json
-├── AGENTS.md                    # AI collaboration guide (vault paths + schemas)
-├── CONCEPT.md                   # Product vision
-├── DECISIONS.md                 # Architectural decisions log
-└── DOCUMENTATION.md             # This file
+├── AGENTS.md
+├── CONCEPT.md
+├── DECISIONS.md
+└── DOCUMENTATION.md
 ```
 
 ---
@@ -155,48 +177,109 @@
 | React | ^19.2.4 | https://react.dev |
 | TypeScript | ^5.9.3 | https://www.typescriptlang.org/docs |
 | Tailwind CSS v4 | ^4.1.18 | https://tailwindcss.com/docs |
-| shadcn/ui | latest | https://ui.shadcn.com |
+| shadcn/ui (component files only) | — | https://ui.shadcn.com |
 | Novel (rich text editor) | ^1.0.2 | https://novel.sh/docs |
 | Prisma ORM | ^7.8.0 | https://www.prisma.io/docs |
 | PostgreSQL (Prisma Postgres) | — | https://www.prisma.io/postgres |
 | better-auth | ^1.6.9 | https://www.better-auth.com/docs |
 | Recharts | 2.15.4 | https://recharts.org/en-US/api |
 | date-fns | 4.1.0 | https://date-fns.org/docs |
+| mcp-handler | — | MCP server (streamable HTTP) |
 | Vercel (hosting) | — | https://vercel.com/docs |
+
+> **shadcn removed from package.json** — shadcn CSS animations and custom variants are vendored into `styles/shadcn-tailwind.css`. Component source files remain under `components/ui/`.
 
 ---
 
 ## Database Schema Overview
 
-Defined in [prisma/schema.prisma](prisma/schema.prisma). Primary models:
+Defined in [prisma/schema.prisma](prisma/schema.prisma).
+
+The schema is **workspace-centric**: vault config, sync state, and file mirrors are scoped to `Workspace`, not `User`.
+
+### Platform models
 
 | Model | Purpose |
 |---|---|
-| `User` | Account, vault repo config, sync state (`lastSyncedSha`, `lastSyncAt`, `initialSyncCompleted`, `syncLockedUntil`) |
-| `VaultFileMirror` | Per-user mirror of `.md` vault files (path, content, optional `frontmatterJson`, `blobSha`) |
+| `PlatformSettings` | Singleton: platform-wide flags (`usersCanCreateWorkspaces`) |
+| `AppRole` | Platform roles (`user`, `admin`) with a `permissions` string array |
+| `User` | Account; linked to one `AppRole`; no vault config (moved to Workspace) |
 | `Session` / `Account` / `Verification` | better-auth tables |
 
-Module content (ideas, clients, time entries) is stored as **Markdown in the vault repo** and read via the mirror — not as separate Prisma entity tables.
+### Workspace models
 
-> **Note**: [CONCEPT.md](./CONCEPT.md) describes a fuller indexed schema (`VaultIndex`, `TimeEntry`, …) that is not the current implementation. The live read model is `VaultFileMirror`.
+| Model | Purpose |
+|---|---|
+| `Workspace` | Vault repo config, GitHub sync state (`lastSyncedSha`, `initialSyncCompleted`, …), MCP config (`mcpEnabled`, `mcpApiKeyHash`), `type` (PERSONAL \| TEAM) |
+| `WorkspaceMember` | User ↔ Workspace membership with role |
+| `WorkspaceNavSection` | Named nav sections inside a workspace sidebar |
+| `WorkspacePage` | Configurable pages per workspace (templateKey, slug, label, icon, order, isEnabled) |
+| `WorkspaceFileMirror` | Per-workspace mirror of text vault files (replaces `VaultFileMirror`) |
+| `UserWorkspacePreference` | Per-user last-active workspace preference |
+
+### Team models
+
+| Model | Purpose |
+|---|---|
+| `Team` | Named team; linked to a workspace via `teamId` |
+| `TeamMember` | User ↔ Team membership |
+
+### Invitation models
+
+| Model | Purpose |
+|---|---|
+| `AppInvitation` | Platform-level invite (grants access to the app) |
+| `WorkspaceInvitation` | Workspace-level invite (grants membership in a workspace) |
+
+Module content (ideas, clients, time entries) is stored as **Markdown in the vault repo** and read via `WorkspaceFileMirror`.
 
 ---
 
 ## Routes
 
+### Shell routes (`(shell)` group — non-workspace pages)
+
+| Route | Purpose |
+|---|---|
+| `/profil` | User profile + global preferences |
+| `/workspaces` | Workspace list / switcher |
+| `/admin` | Platform admin overview |
+| `/admin/users` | Manage platform users |
+| `/admin/roles` | Manage platform roles |
+| `/admin/invitations` | Manage app invitations |
+
+### Workspace routes (`/w/[workspaceSlug]/...`)
+
 | Route | Module | Vault path |
 |---|---|---|
-| `/` | Dashboard home | — |
-| `/vault` | Vault file browser | any mirrored text file |
-| `/aufgaben` | Task management (Kanban) | `tasks/[slug].md` |
-| `/clients` | Client management | `clients/[slug].md` or `clients/[Name]/[slug].md` |
-| `/clients/[slug]` | Client detail | same |
-| `/produkt-ideen` | Product ideas (Kanban) | `ideas/products/[slug].md` |
-| `/projects` | Portfolio projects | `projects/[slug].md` |
-| `/zeiterfassung` | Time tracking (list + manual entry) | `zeiterfassung/YYYY-MM/YYYY-MM-DD_projekt.md` |
-| `/zeiterfassung2` | Time tracking v2 (donut timer + sessions) | same |
-| `/profil` | Profile + vault repo settings | `profile/[section]/[slug].md` |
-| `/kunden` | Legacy client list | `clients/` (same mirror) |
+| `/w/[slug]` | Workspace home | — |
+| `/w/[slug]/vault` | Vault file browser | any mirrored text file |
+| `/w/[slug]/vault/[...path]` | Vault file editor | specific file |
+| `/w/[slug]/aufgaben/[taskSlug]` | Task detail | `tasks/[slug].md` |
+| `/w/[slug]/clients` | Client management | `clients/[slug].md` |
+| `/w/[slug]/clients/[slug]` | Client detail | same |
+| `/w/[slug]/produkt-ideen/[cat]/[slug]` | Product idea detail | `ideas/products/[slug].md` |
+| `/w/[slug]/projects/[slug]` | Project detail | `projects/[slug].md` |
+| `/w/[slug]/[pageSlug]` | Dynamic workspace page | — |
+| `/w/[slug]/settings` | Workspace settings root | — |
+| `/w/[slug]/settings/general` | General settings | — |
+| `/w/[slug]/settings/github` | GitHub vault config | — |
+| `/w/[slug]/settings/mcp` | MCP API key | — |
+| `/w/[slug]/settings/members` | Workspace members | — |
+| `/w/[slug]/settings/pages` | Sidebar page config | — |
+| `/w/[slug]/settings/users` | User management (workspace-level) | — |
+
+### Legacy top-level routes (kept for backwards compat)
+
+`/aufgaben`, `/clients`, `/clients/[slug]`, `/produkt-ideen`, `/projects`, `/vault`, `/zeiterfassung`, `/zeiterfassung2`, `/kunden`
+
+### Public routes
+
+| Route | Purpose |
+|---|---|
+| `/login` | GitHub OAuth sign-in |
+| `/register` | Registration (invite-gated) |
+| `/workspace-invite/[token]` | Accept workspace invitation |
 
 ---
 
@@ -206,11 +289,73 @@ All flags live in [lib/config.ts](lib/config.ts):
 
 | Flag | Default | Meaning |
 |---|---|---|
-| `auth` | `true` | Auth is active; middleware enforces login |
-| `githubSync` | `true` | When user has `githubSync` in DB + repo configured, reads use mirror / GitHub |
+| `githubSync` | `true` | When workspace has `githubSync` in DB + repo configured, reads use mirror / GitHub |
 | `editing` | `true` | Vault file editing (GitHub API + mirror upsert) |
 | `timeTracking` | `true` | Time tracking module enabled |
 | `productIdeas` | `true` | Product ideas module enabled |
+
+---
+
+## Platform roles & permissions
+
+Roles are stored in `AppRole` and assigned to users. Two system roles exist:
+
+| Role key | Permissions |
+|---|---|
+| `user` | `workspace.invite` |
+| `admin` | `platform.admin`, `workspace.create`, `invitation.create`, `workspace.invite`, `user.manage`, `role.manage` |
+
+Key files:
+
+| Path | Role |
+|---|---|
+| `lib/platform-permissions.ts` | `PlatformPermission` type + `hasPlatformPermission()` |
+| `lib/platform-roles.ts` | `ensurePlatformRoles()`, `getUserPermissionContext()`, `userHasPermission()`, `syncBetterAuthRoleForUser()` |
+| `lib/platform-admin.ts` | Admin-level user/role operations |
+
+`ensurePlatformRoles()` is idempotent — safe to call on every boot.
+
+---
+
+## MCP server
+
+The MCP server is implemented at `app/api/mcp/[transport]/route.ts` using **mcp-handler** (streamable HTTP transport).
+
+Authentication uses a workspace API key. Each workspace can generate an API key under **Settings → MCP**. The key is stored hashed (`mcpApiKeyHash`) on the `Workspace` row.
+
+| Path | Role |
+|---|---|
+| `app/api/mcp/[transport]/route.ts` | MCP route handler; registers tools and wires auth |
+| `lib/mcp/auth.ts` | `resolveWorkspaceForMcpTool()`, `verifyMcpBearerToken()` |
+| `lib/mcp/api-key.ts` | Key generation + hashing |
+| `lib/mcp/oauth-resource-cors.ts` | CORS allowlist for MCP OAuth protected-resource endpoint |
+| `lib/mcp/urls.ts` | MCP endpoint URL helpers |
+| `lib/rate-limit.ts` | Rate limiting for MCP requests |
+
+`proxy.ts` passes `/.well-known/` paths through without redirect so MCP OAuth metadata probes succeed.
+
+Currently registered tools: `get_workspace_info` (returns workspace id / name / slug for the authenticated API key).
+
+---
+
+## Invitations
+
+Two invitation flows exist:
+
+| Type | Model | Flow |
+|---|---|---|
+| **App invitation** | `AppInvitation` | Admin creates invite → user registers via token → gets `user` role + personal workspace |
+| **Workspace invitation** | `WorkspaceInvitation` | Workspace member invites email → recipient accepts at `/workspace-invite/[token]` |
+
+Key files:
+
+| Path | Role |
+|---|---|
+| `lib/invitations/resolve-invitations-for-new-user.ts` | `resolveWorkspaceInvitationsForNewUser()` + `resolveAppInvitationsForNewUser()` — called during sign-up |
+| `lib/invitations/fulfill-workspace-invitation.ts` | Marks invitation accepted + creates WorkspaceMember |
+| `lib/invitations/accept-app-invitation-by-token.ts` | Validates app invitation token |
+| `lib/invitation-utils.ts` | Shared invitation helpers |
+| `app/actions/invitations.ts` | Server actions for invitation CRUD |
 
 ---
 
@@ -221,14 +366,16 @@ All flags live in [lib/config.ts](lib/config.ts):
 ```text
 GitHub vault repo (source of truth)
         │
-        ├─ Push webhook ──► POST /api/webhook/github ──► syncVaultForUser()
+        ├─ Push webhook ──► POST /api/webhook/github ──► syncVaultForWorkspace()
         │
         ├─ App writes ─────► Octokit create/update/delete ──► mirror upsert/delete
         │
-        └─ Background sync ► compareCommits + tree reconcile ──► VaultFileMirror
+        └─ Background sync ► compareCommits + tree reconcile ──► WorkspaceFileMirror
 
 Dashboard UI ◄── listMarkdownUnderPrefix / getGitHubTree (mirror paths)
 ```
+
+Sync state (`lastSyncedSha`, `lastSyncAt`, `initialSyncCompleted`, `syncLockedUntil`) is on the `Workspace` row, not the `User` row.
 
 ### Key files
 
@@ -236,12 +383,12 @@ Dashboard UI ◄── listMarkdownUnderPrefix / getGitHubTree (mirror paths)
 |------|------|
 | `lib/sync/sync-vault-for-user.ts` | Full pull: import, incremental sync, optional orphan reconcile |
 | `lib/sync/branch-tip.ts` | `getBranchTipWithTree()` — single fetch for `commitSha` + `treeSha` |
-| `lib/sync/bump-sync-pointer.ts` | `bumpUserLastSyncedSha()` — advances `lastSyncedSha` after app writes so follow-up pull is a no-op |
+| `lib/sync/bump-sync-pointer.ts` | `bumpUserLastSyncedSha()` — advances `lastSyncedSha` after app writes |
 | `lib/sync/check-vault-remote.ts` | Branch-tip check only (no lock, no mirror mutation) |
 | `lib/sync/incremental.ts` | `compareCommits` delta; `reconcileOrphans` is opt-in (default false) |
 | `lib/sync/graphql-blobs.ts` | Parallel GraphQL blob fetch (`GRAPHQL_CONCURRENCY=3`) |
 | `lib/sync/types.ts` | `SyncResult`, `SyncVaultOptions`, `VaultRemoteCheckResult` |
-| `lib/sync/github-webhook.ts` | Signature verify, resolve users by owner/repo/branch |
+| `lib/sync/github-webhook.ts` | Signature verify, resolve workspaces by owner/repo/branch |
 | `app/api/webhook/github/route.ts` | Webhook HTTP handler (202 + `after()` sync) |
 | `lib/vault/sync-ui-context.tsx` | Tiered client triggers: focus check, writes, webhook poll |
 | `components/layout/app-status-indicator.tsx` | Unified top-right status (save + mirror sync) |
@@ -249,6 +396,7 @@ Dashboard UI ◄── listMarkdownUnderPrefix / getGitHubTree (mirror paths)
 | `lib/background-save.ts` / `hooks/use-background-save.ts` | Background save helpers |
 | `app/(dashboard)/template.tsx` | `VaultSyncProvider` + `AppStatusIndicator` |
 | `app/actions/vault-sync.ts` | `checkVaultRemote`, `executeVaultSync`, `getVaultSyncSnapshot`, force resync |
+| `app/actions/workspace-vault-sync.ts` | Workspace-scoped sync actions |
 | `scripts/smee-webhook-forward.ts` | Local dev: smee.io → localhost webhook |
 
 ### Sync triggers (client)
@@ -264,8 +412,8 @@ Pull cooldown: **60s** between client-initiated full syncs (writes bypass cooldo
 
 ### Sync triggers (server)
 
-- **GitHub push webhook** — `syncVaultMirrorForGitHubPush()` for all users matching repo + branch
-- **Manual** — Profil **Cache leeren & neu laden** (`forceFullVaultResync`)
+- **GitHub push webhook** — `syncVaultMirrorForGitHubPush()` for all workspaces matching repo + branch
+- **Manual** — Workspace Settings **Cache leeren & neu laden** (`forceFullVaultResync`)
 
 ### UI status indicator (single pill, top-right)
 
@@ -273,7 +421,7 @@ All save, sync, and mirror activity is shown in **`AppStatusIndicator`** (`fixed
 
 | Source | When it shows |
 |--------|----------------|
-| `SyncProvider` (`startSync` / `endSync`) | GitHub writes in flight → „Speichern…“, then „Gespeichert“ |
+| `SyncProvider` (`startSync` / `endSync`) | GitHub writes in flight → „Speichern…", then „Gespeichert" |
 | `VaultEditorGuardProvider` | Background save on navigation (Vault editor) |
 | `VaultSyncProvider` | Mirror check / pull / error |
 
@@ -321,8 +469,6 @@ Vault modules use a **right drawer** instead of modals. Shared pieces:
 | `hooks/use-detail-drawer.ts` | Dirty tracking, close → background save, explicit save |
 | `lib/detail-drawer/constants.ts` | `DRAFT_RECORD_SLUG` (`__draft__`) for unsaved records |
 
-Module views: `task-detail-view`, `project-detail-view`, `idea-detail-view`, `entry-detail-view`, `client-quick-detail-drawer` (Listen-Drawer; Vollseite bleibt `client-detail-view` unter `/clients/[slug]`).
-
 **Create flow:** `setTarget(createDraft*())` + `setOpen(true)`. On save, slug is derived (`slugify(title)` etc.). Parent `handleSave` should treat `isDraftSlug` when syncing drawer target.
 
 **Close flow:** `useDetailDrawer` → `closeAndSaveInBackground` → `useBackgroundSave` + parent optimistic `handleSave`.
@@ -346,27 +492,46 @@ See [README.md](./README.md#local-webhook-smeeio). Use `npm run dev:smee` with p
 
 ---
 
+## Proxy (middleware)
+
+`proxy.ts` is the Next.js middleware file (exported as `proxy`, matched via `config.matcher`). It:
+
+- Redirects unauthenticated requests to `/login` (with `callbackUrl`)
+- Redirects authenticated users away from public pages (except invite flows)
+- Passes `/.well-known/` paths through without redirect (required for MCP OAuth probes)
+- Injects `x-pathname` header so server components can read the active route
+
+> `middleware.ts` was deleted — `proxy.ts` is the single middleware entry point.
+
+---
+
 ## Current State
 
 ### Working
 
-- **Authentication** — better-auth with GitHub OAuth; middleware gates dashboard routes; single-admin enforcement.
-- **Vault mirror** — `VaultFileMirror` + sync state on `User`; full and incremental import from GitHub.
+- **Authentication** — better-auth with GitHub OAuth; `proxy.ts` gates dashboard routes; invite-gated registration.
+- **Platform roles** — `AppRole` with `user` / `admin` system roles; permission checks via `hasPlatformPermission()`.
+- **Multi-workspace** — `Workspace` model with per-workspace vault config, sync state, and sidebar pages.
+- **Workspace members** — `WorkspaceMember`; workspace settings pages for member management.
+- **Invitations** — `AppInvitation` (platform) + `WorkspaceInvitation` (workspace); resolution at sign-up.
+- **Admin** — `/admin` routes for platform users, roles, and invitations.
+- **MCP server** — `/api/mcp/[transport]`; workspace API key auth; `get_workspace_info` tool.
+- **Vault mirror** — `WorkspaceFileMirror` (replaces `VaultFileMirror`) + sync state on `Workspace`.
 - **Vault UI** — tree browser, editor, optimistic mutations with GitHub + mirror updates.
 - **GitHub webhook** — `/api/webhook/github` for push-triggered mirror sync.
-- **Sync optimizations** — single `getBranchTipWithTree()` call per sync cycle; `reconcileOrphans` is opt-in (hot path skips it); parallel GraphQL blob batching; post-write `bumpUserLastSyncedSha()` avoids redundant re-processing.
+- **Sync optimizations** — single `getBranchTipWithTree()` call per cycle; `reconcileOrphans` opt-in; parallel GraphQL blob batching; post-write `bumpSyncedSha` avoids redundant re-processing.
 - **Sync UI** — unified top-right `AppStatusIndicator` (save + mirror sync) + auto-refresh after background sync.
 - **Background save** — Vault navigation + Aufgaben drawer; `useBackgroundSave()` / `SyncProvider`.
-- **Aufgaben** — task management Kanban (`tasks/` vault folder); CRUD via GitHub API.
-- **Clients** — client management with detail pages (`clients/` vault folder); replaces legacy `/kunden`.
+- **Aufgaben** — task Kanban (`tasks/` vault folder); CRUD via GitHub API.
+- **Clients** — client management with detail pages (`clients/` vault folder).
 - **Projects** — portfolio project management (`projects/` vault folder).
 - **Produkt-Ideen** — product idea Kanban (`ideas/products/` vault folder).
 - **Zeiterfassung** — time tracking list; `zeiterfassung2` adds donut timer + sessions UI.
-- **Profil** — vault repo settings, mirror stats, manual full resync.
-- **Middleware** — injects `x-pathname` header so server components can read the active route.
+- **shadcn CSS vendored** — `styles/shadcn-tailwind.css`; `shadcn` removed from `package.json`.
 
 ### Partial / planned
 
-- **MCP server** — described in CONCEPT.md; not implemented in this app repo.
 - **ISR / public JSON APIs** — webhook currently syncs mirror only; separate site revalidation is not wired.
-- **`zeiterfassung2`** — new timer UI exists at `/zeiterfassung2` but is not yet linked in the main sidebar.
+- **`zeiterfassung2`** — timer UI exists at `/zeiterfassung2` but not yet linked in the main sidebar.
+- **Teams** — `Team` / `TeamMember` models exist; team workspace UI not yet built.
+- **MCP tools** — only `get_workspace_info` registered; vault read/write tools planned.
