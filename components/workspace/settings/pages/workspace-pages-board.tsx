@@ -391,7 +391,6 @@ function AddPageDialog({
 			try {
 				await addWorkspacePage(workspaceId, {
 					templateKey: selectedTemplate.templateKey,
-					slug: selectedTemplate.defaultSlug,
 					label: label || selectedTemplate.defaultLabel,
 					icon: selectedTemplate.defaultIcon,
 					navSectionId: defaultContainerId === UNSECTIONED_ID ? null : defaultContainerId,

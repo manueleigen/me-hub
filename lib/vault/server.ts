@@ -8,7 +8,7 @@ export const getUserVaultService = cache(async () => {
 	const owner = (workspace?.vaultGithubOwner ?? "").trim();
 	const repo = (workspace?.vaultGithubRepo ?? "").trim();
 	const githubSync = Boolean(workspace?.githubSync && owner && repo);
-	return createVaultService({ githubSync });
+	return createVaultService({ githubSync, workspaceId: workspace?.id ?? null });
 });
 
 /**

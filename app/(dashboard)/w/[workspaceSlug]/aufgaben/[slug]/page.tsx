@@ -1,36 +1,39 @@
-import type { Metadata } from "next";
-import { Suspense } from "react";
-import { PageLoadingShell } from "@/components/loading/page-loading-shell";
-import { generateTaskDetailMetadata } from "@/lib/page-metadata";
-import { TaskDetailContent } from "@/app/(dashboard)/aufgaben/[slug]/task-detail-content";
+import { redirect } from "next/navigation";
+import { prisma } from "@/lib/prisma";
+import { getAuthSession } from "@/lib/auth";
+import { taskDetailPath } from "@/lib/workspace-paths";
 
-export async function generateMetadata({
-	params,
-}: {
-	params: Promise<{ slug: string }>;
-}): Promise<Metadata> {
-	const { slug } = await params;
-	return generateTaskDetailMetadata(slug);
-}
-
-export default async function WorkspaceTaskDetailPage({
+/** Legacy `/w/.../aufgaben/[slug]` → canonical page slug from workspace config. */
+export default async function LegacyWorkspaceTaskDetailPage({
 	params,
 }: {
 	params: Promise<{ workspaceSlug: string; slug: string }>;
 }) {
-	const { slug } = await params;
+	const { workspaceSlug, slug } = await params;
 
-	return (
-		<Suspense
-			fallback={
-				<PageLoadingShell
-					breadcrumbs={[{ label: "Aufgaben" }, { label: slug }]}
-					title={slug}
-					variant="detail"
-				/>
-			}
-		>
-			<TaskDetailContent slug={slug} />
-		</Suspense>
-	);
+	const session = await getAuthSession();
+	if (!session?.user?.id) return null;
+
+	const page =
+		(await prisma.workspacePage.findFirst({
+			where: {
+				workspace: { slug: workspaceSlug },
+				templateKey: "aufgaben",
+				isEnabled: true,
+				slug: "aufgaben",
+			},
+			select: { slug: true },
+		})) ??
+		(await prisma.workspacePage.findFirst({
+			where: {
+				workspace: { slug: workspaceSlug },
+				templateKey: "aufgaben",
+				isEnabled: true,
+			},
+			orderBy: { order: "asc" },
+			select: { slug: true },
+		}));
+
+	const pageSlug = page?.slug ?? "aufgaben";
+	redirect(taskDetailPath(workspaceSlug, pageSlug, slug));
 }

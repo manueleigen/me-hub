@@ -28,7 +28,7 @@ import type {
 } from "@/types/aufgaben";
 import type { WorkspaceMemberSummary } from "@/app/actions/workspaces";
 import { useWorkspace } from "@/lib/workspace-context";
-import { taskDetailPath } from "@/lib/workspace-paths";
+import { resolveTasksPageSlug, taskDetailPath } from "@/lib/workspace-paths";
 import { cn } from "@/lib/utils";
 
 const kanbanColumns: KanbanColumn[] = (
@@ -126,7 +126,9 @@ export function ProjectTasksSection({
 	listMaxWidthClass,
 }: ProjectTasksSectionProps) {
 	const vaultWriteEnabled = useVaultWriteEnabled();
-	const workspaceSlug = useWorkspace()?.workspace.slug;
+	const workspace = useWorkspace();
+	const workspaceSlug = workspace?.workspace.slug;
+	const tasksPageSlug = resolveTasksPageSlug(workspace?.workspace.pages);
 	const router = useRouter();
 	const { requestSyncAfterWrite } = useVaultSync();
 	const { startSync, endSync } = useSync();
@@ -148,7 +150,7 @@ export function ProjectTasksSection({
 	};
 
 	const openDetail = (task: Task) => {
-		router.push(taskDetailPath(workspaceSlug, task.slug));
+		router.push(taskDetailPath(workspaceSlug, tasksPageSlug, task.slug));
 	};
 
 	const handleSave = async (

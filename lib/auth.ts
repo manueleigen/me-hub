@@ -36,8 +36,8 @@ export const auth = betterAuth({
 		github: {
 			clientId: process.env.GITHUB_CLIENT_ID as string,
 			clientSecret: process.env.GITHUB_CLIENT_SECRET as string,
-			/** Explicit minimal classic scopes: identity + repo API for vault when no workspace PAT. */
-			scopes: ["read:user", "user:email", "repo"],
+			/** Login only — vault repo access uses per-workspace fine-grained PATs, not OAuth. */
+			scopes: ["read:user", "user:email"],
 		},
 	},
 	databaseHooks: {

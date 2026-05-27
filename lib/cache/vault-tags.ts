@@ -16,7 +16,6 @@ export function revalidateVaultCache(userId: string): void {
 
 export function revalidateWorkspaceVaultCache(workspaceId: string): void {
 	try {
-		revalidateTag(VAULT_CACHE_TAG, "max");
 		revalidateTag(`${VAULT_CACHE_TAG}-ws-${workspaceId}`, "max");
 	} catch (error) {
 		if (process.env.NODE_ENV === "development") {

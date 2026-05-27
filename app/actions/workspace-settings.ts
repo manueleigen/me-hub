@@ -15,6 +15,25 @@ import {
 	getWorkspacePageTemplate,
 	isValidWorkspacePageTemplateKey,
 } from "@/lib/workspace-page-templates";
+import { pageSlugFromLabel } from "@/lib/workspace-page-slug";
+
+async function ensureUniquePageSlug(
+	workspaceId: string,
+	desired: string,
+	excludePageId?: string,
+): Promise<string> {
+	let slug = desired;
+	let counter = 1;
+	while (true) {
+		const existing = await prisma.workspacePage.findUnique({
+			where: { workspaceId_slug: { workspaceId, slug } },
+			select: { id: true },
+		});
+		if (!existing || existing.id === excludePageId) return slug;
+		counter++;
+		slug = `${desired}-${counter}`;
+	}
+}
 
 async function revalidateWorkspaceSettings(slug: string) {
 	revalidatePath(`/w/${slug}/settings`);
@@ -441,11 +460,12 @@ export async function addWorkspacePage(
 	workspaceId: string,
 	page: {
 		templateKey: string;
-		slug: string;
+		slug?: string;
 		label: string;
 		icon?: string;
 		order?: number;
 		navSectionId?: string | null;
+		config?: Record<string, unknown> | null;
 	},
 ) {
 	await requireWorkspaceAdmin(workspaceId);
@@ -472,12 +492,10 @@ export async function addWorkspacePage(
 		select: { order: true },
 	});
 
-	let slug = page.slug;
-	let counter = 1;
-	while (await prisma.workspacePage.findUnique({ where: { workspaceId_slug: { workspaceId, slug } } })) {
-		counter++;
-		slug = `${page.slug}-${counter}`;
-	}
+	const baseSlug =
+		page.slug?.trim() ||
+		pageSlugFromLabel(page.label, template.defaultSlug);
+	const slug = await ensureUniquePageSlug(workspaceId, baseSlug);
 
 	await prisma.workspacePage.create({
 		data: {
@@ -489,7 +507,12 @@ export async function addWorkspacePage(
 			order: page.order ?? (last?.order ?? -1) + 1,
 			isEnabled: true,
 			navSectionId,
-			config: { dataFolder: template.defaultDataFolder },
+			config:
+				page.config === undefined
+					? { dataFolder: template.defaultDataFolder }
+					: page.config === null
+						? Prisma.JsonNull
+						: (page.config as Prisma.InputJsonValue),
 		},
 	});
 
@@ -525,11 +548,17 @@ export async function updateWorkspacePage(
 		throw new Error("Ungültige Seitenart");
 	}
 
-	const { config, ...rest } = data;
+	const { config, slug: requestedSlug, ...rest } = data;
+	const slug =
+		requestedSlug !== undefined
+			? await ensureUniquePageSlug(workspaceId, requestedSlug.trim(), pageId)
+			: undefined;
+
 	await prisma.workspacePage.update({
 		where: { id: pageId, workspaceId },
 		data: {
 			...rest,
+			...(slug !== undefined ? { slug } : {}),
 			...(config !== undefined
 				? { config: config === null ? Prisma.JsonNull : (config as Prisma.InputJsonValue) }
 				: {}),

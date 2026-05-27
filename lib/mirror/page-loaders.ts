@@ -285,9 +285,9 @@ export const loadClientDetailPageData = cache(async (slug: string) => {
 	};
 });
 
-export const loadTaskDetailPageData = cache(async (slug: string) => {
+export const loadTaskDetailPageData = cache(async (slug: string, tasksFolder?: string) => {
 	const [tasks, projects, clients] = await Promise.all([
-		listTasks(),
+		listTasks(tasksFolder),
 		listProjects(),
 		listClients(),
 	]);

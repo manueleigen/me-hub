@@ -15,7 +15,6 @@ import {
 } from "@/app/actions/workspace-settings";
 import { useVaultLink } from "@/lib/vault-link-context";
 import { Loader2 } from "lucide-react";
-
 function TokenStatusBadge({ settings }: { settings: WorkspaceGithubSettingsView }) {
 	if (settings.hasGithubToken) {
 		return (
@@ -38,8 +37,8 @@ function TokenStatusDescription({ settings }: { settings: WorkspaceGithubSetting
 	}
 	return (
 		<p className="text-xs text-muted-foreground">
-			Kein Token hinterlegt — GitHub Sync funktioniert erst nach Eintrag eines PAT durch einen
-			Admin.
+			Kein PAT hinterlegt — Vault-Sync und Schreibzugriff sind deaktiviert, bis ein Admin ein
+			fein abgestuftes PAT speichert. GitHub-Login dient nur der Anmeldung.
 		</p>
 	);
 }

@@ -9,8 +9,8 @@ export function useRevalidatePage() {
 	const router = useRouter();
 	const { requestSyncAfterWrite } = useVaultSync();
 
-	return useCallback(async () => {
-		await requestSyncAfterWrite();
+	return useCallback(() => {
 		router.refresh();
+		void requestSyncAfterWrite();
 	}, [router, requestSyncAfterWrite]);
 }

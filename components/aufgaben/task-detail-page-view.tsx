@@ -42,6 +42,9 @@ type TaskDetailPageViewProps = {
 	projects: Project[];
 	clients: Client[];
 	members?: WorkspaceMemberSummary[];
+	pageSlug?: string;
+	tasksFolder?: string;
+	pageLabel?: string;
 };
 
 export function TaskDetailPageView({
@@ -51,6 +54,9 @@ export function TaskDetailPageView({
 	projects,
 	clients,
 	members = [],
+	pageSlug = "aufgaben",
+	tasksFolder = "tasks",
+	pageLabel = "Aufgaben",
 }: TaskDetailPageViewProps) {
 	const workspaceSlug = useWorkspace()?.workspace.slug;
 	const router = useRouter();
@@ -71,7 +77,7 @@ export function TaskDetailPageView({
 		sha?: string,
 		nextComments: TaskComment[] = comments,
 	) => {
-		await saveTask(slug, data, sha ?? task.sha, nextComments);
+		await saveTask(slug, data, sha ?? task.sha, nextComments, tasksFolder);
 		const saved: Task = {
 			...data,
 			slug,
@@ -83,7 +89,7 @@ export function TaskDetailPageView({
 		setTask(saved);
 		setComments(nextComments);
 		if (slug !== task.slug) {
-			router.replace(taskDetailPath(workspaceSlug, slug));
+			router.replace(taskDetailPath(workspaceSlug, pageSlug, slug));
 		}
 	};
 
@@ -108,15 +114,15 @@ export function TaskDetailPageView({
 
 	const handleDelete = async () => {
 		if (!task.sha) return;
-		await deleteTask(task.slug, task.sha);
+		await deleteTask(task.slug, task.sha, tasksFolder);
 		toast.success("Aufgabe gelöscht");
-		router.push(tasksListPath(workspaceSlug));
+		router.push(tasksListPath(workspaceSlug, pageSlug));
 	};
 
 	return (
 		<EntityDetailPageLayout
-			listLabel="Aufgaben"
-			listHref={tasksListPath(workspaceSlug)}
+			listLabel={pageLabel}
+			listHref={tasksListPath(workspaceSlug, pageSlug)}
 			title={task.title}
 			badges={
 				<StatusPriorityBadges
@@ -196,7 +202,7 @@ export function TaskDetailPageView({
 							icon={<FolderKanban className="size-4" />}
 							items={relatedTasks}
 							getItemKey={(t) => t.slug}
-							getHref={(t) => taskDetailPath(workspaceSlug, t.slug)}
+							getHref={(t) => taskDetailPath(workspaceSlug, pageSlug, t.slug)}
 							getTitle={(t) => t.title}
 							getStatus={(t) => t.status}
 							statusConfig={STATUS_CONFIG}

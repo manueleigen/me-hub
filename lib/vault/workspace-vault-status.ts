@@ -36,7 +36,7 @@ export function resolveVaultLinkStatus(input: {
 	return { vaultLinked: false, settingsHref: "/workspaces" };
 }
 
-/** Server-side: repo configured and a GitHub token is available (PAT, OAuth, or env). */
+/** Server-side: repo configured and a workspace PAT is stored. */
 export async function resolveActiveVaultLinkStatus(
 	resolved: ResolvedWorkspace | null,
 ): Promise<{ vaultLinked: boolean; settingsHref: string }> {

@@ -18,7 +18,16 @@ import { listMarkdownUnderPrefixWithContent } from "@/lib/vault/list-markdown";
 import { vaultModuleEntrySlugFromBasename } from "@/lib/vault/mirrorable-text-files";
 import type { Task, TaskComment, TaskFrontmatter, TaskStatus } from "@/types/aufgaben";
 
-const TASKS_FOLDER = "tasks";
+const DEFAULT_TASKS_FOLDER = "tasks";
+
+function resolveTasksFolder(folder?: string): string {
+  if (folder?.trim()) return folder.trim().replace(/^\/+/, "").replace(/\/+$/, "");
+  return DEFAULT_TASKS_FOLDER;
+}
+
+function taskFilePath(tasksFolder: string, slug: string): string {
+  return `${tasksFolder}/${slug}.md`;
+}
 
 async function revalidateTasksCache(): Promise<void> {
   const ctx = await getCachedMirrorReadContext();
@@ -27,8 +36,9 @@ async function revalidateTasksCache(): Promise<void> {
   }
 }
 
-export async function listTasks(): Promise<Task[]> {
-  const files = await listMarkdownUnderPrefixWithContent(TASKS_FOLDER);
+export async function listTasks(tasksFolder?: string): Promise<Task[]> {
+  const folder = resolveTasksFolder(tasksFolder);
+  const files = await listMarkdownUnderPrefixWithContent(folder);
 
   return files
     .map((f) => {
@@ -62,7 +72,9 @@ export async function saveTask(
   data: TaskFrontmatter,
   sha?: string,
   comments: TaskComment[] = [],
+  tasksFolder?: string,
 ): Promise<string | undefined> {
+  const folder = resolveTasksFolder(tasksFolder);
   const now = new Date().toISOString().slice(0, 10);
   const content = serializeTaskFile({
     title: data.title,
@@ -77,7 +89,7 @@ export async function saveTask(
     createdAt: data.createdAt ?? (!sha ? now : undefined),
     updatedAt: now,
   });
-  const path = `${TASKS_FOLDER}/${slug}.md`;
+  const path = taskFilePath(folder, slug);
   const resolvedSha = sha ? await resolveFileSha(path, sha) : undefined;
   const result = await createOrUpdateGitHubFile(
     path,
@@ -89,8 +101,13 @@ export async function saveTask(
   return result.content?.sha ?? undefined;
 }
 
-export async function deleteTask(slug: string, sha: string): Promise<void> {
-  const path = `${TASKS_FOLDER}/${slug}.md`;
+export async function deleteTask(
+  slug: string,
+  sha: string,
+  tasksFolder?: string,
+): Promise<void> {
+  const folder = resolveTasksFolder(tasksFolder);
+  const path = taskFilePath(folder, slug);
   const resolvedSha = await resolveFileSha(path, sha);
   if (!resolvedSha) {
     throw new Error(`Task not found: ${slug}`);
@@ -103,8 +120,10 @@ export async function updateTaskStatus(
   slug: string,
   sha: string,
   newStatus: TaskStatus,
+  tasksFolder?: string,
 ): Promise<void> {
-  const path = `${TASKS_FOLDER}/${slug}.md`;
+  const folder = resolveTasksFolder(tasksFolder);
+  const path = taskFilePath(folder, slug);
   const file = await getGitHubItem(path);
   if (!file || Array.isArray(file) || !("content" in file)) {
     throw new Error(`Task not found: ${slug}`);

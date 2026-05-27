@@ -37,9 +37,15 @@ import { taskDetailPath } from "@/lib/workspace-paths";
 export function AufgabenView({
 	tasks: initialTasks,
 	members = [],
+	pageSlug = "aufgaben",
+	tasksFolder = "tasks",
+	pageLabel = "Aufgaben",
 }: {
 	tasks: Task[];
 	members?: WorkspaceMemberSummary[];
+	pageSlug?: string;
+	tasksFolder?: string;
+	pageLabel?: string;
 }) {
 	const workspaceSlug = useWorkspace()?.workspace.slug;
 	const router = useRouter();
@@ -77,12 +83,13 @@ export function AufgabenView({
 				data,
 				previous?.sha ?? optimistic.sha,
 				optimistic.comments ?? [],
+				tasksFolder,
 			);
 			return newSha ? { ...optimistic, sha: newSha } : optimistic;
 		},
-		deleteItem: (task) => deleteTask(task.slug, task.sha!),
+		deleteItem: (task) => deleteTask(task.slug, task.sha!, tasksFolder),
 		updateItemStatus: (task, status) =>
-			updateTaskStatus(task.slug, task.sha!, status as TaskStatus),
+			updateTaskStatus(task.slug, task.sha!, status as TaskStatus, tasksFolder),
 		applyStatus: (task, status) => ({
 			...task,
 			status: status as TaskStatus,
@@ -133,7 +140,7 @@ export function AufgabenView({
 				listState.setDetailOpen(true);
 			}}
 			onOpenDetail={(task) =>
-				router.push(taskDetailPath(workspaceSlug, task.slug))
+				router.push(taskDetailPath(workspaceSlug, pageSlug, task.slug))
 			}
 			onDelete={listState.handleDelete}
 			onStatusChange={listState.handleStatusChange}

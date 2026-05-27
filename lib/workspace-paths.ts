@@ -1,4 +1,16 @@
+import type { WorkspacePageData } from "@/lib/workspace-context";
+
 const WORKSPACES_FALLBACK = "/workspaces";
+
+/** Slug of the workspace page used for task links (first enabled Aufgaben page). */
+export function resolveTasksPageSlug(
+	pages: WorkspacePageData[] | undefined,
+	preferredPageSlug?: string,
+): string {
+	if (preferredPageSlug?.trim()) return preferredPageSlug.trim();
+	const match = pages?.find((p) => p.templateKey === "aufgaben" && p.isEnabled);
+	return match?.slug ?? "aufgaben";
+}
 
 function resolveWorkspaceSlug(workspaceSlug: string | undefined): string {
 	if (workspaceSlug?.trim()) return workspaceSlug.trim();
@@ -26,12 +38,16 @@ export function projectsListPath(workspaceSlug: string | undefined) {
 	return workspaceModulePath(workspaceSlug, "projects");
 }
 
-export function taskDetailPath(workspaceSlug: string | undefined, taskSlug: string) {
-	return workspaceModulePath(workspaceSlug, "aufgaben", taskSlug);
+export function taskDetailPath(
+	workspaceSlug: string | undefined,
+	pageSlug: string,
+	taskSlug: string,
+) {
+	return workspaceModulePath(workspaceSlug, pageSlug, taskSlug);
 }
 
-export function tasksListPath(workspaceSlug: string | undefined) {
-	return workspaceModulePath(workspaceSlug, "aufgaben");
+export function tasksListPath(workspaceSlug: string | undefined, pageSlug: string) {
+	return workspaceModulePath(workspaceSlug, pageSlug);
 }
 
 export function ideaDetailPath(

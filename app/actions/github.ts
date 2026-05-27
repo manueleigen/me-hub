@@ -4,6 +4,11 @@ import { getOctokitClient } from "@/lib/github/octokit";
 import { assertSafeVaultContentPath } from "@/lib/github/vault-content-path";
 import { getCachedVaultConfig } from "@/lib/cache/server";
 import { getGitHubTokenForWorkspace } from "@/lib/github/token";
+import {
+	ensureVaultGitHubWriteToken,
+	formatGitHubVaultWriteError,
+} from "@/lib/github/ensure-vault-write-token";
+import { resolveFileSha } from "@/lib/github/resolve-file-sha";
 import { requireActiveWorkspaceVaultLinked } from "@/lib/vault/require-vault-linked";
 import { getMirrorReadContext } from "@/lib/github/mirror-context";
 import {
@@ -14,7 +19,6 @@ import {
 	upsertWorkspaceMirrorFile,
 	deleteWorkspaceMirrorPath,
 } from "@/lib/mirror/workspace-mirror";
-import { isMirrorPlaceholderSha } from "@/lib/github/resolve-file-sha";
 import { bumpWorkspaceLastSyncedSha } from "@/lib/sync/bump-sync-pointer";
 import { getVaultConfig } from "@/lib/vault/config";
 
@@ -91,24 +95,40 @@ export async function getGitHubDir(path: string = "") {
 export async function deleteGitHubFile(path: string, sha: string) {
 	const safePath = assertSafeVaultContentPath(path);
 	await requireActiveWorkspaceVaultLinked();
-	const { owner, repo, branch } = await getVaultConfig();
-	const octokit = await getOctokit();
-	const { data } = await octokit.rest.repos.deleteFile({
-		owner,
-		repo,
-		path: safePath,
-		message: `Delete ${safePath}`,
-		sha,
-		branch,
-	});
+	const { owner, repo, branch, workspaceId } = await getCachedVaultConfig();
+	if (!workspaceId) throw new Error("No active workspace for vault delete");
 
+	const resolvedSha = await resolveFileSha(safePath, sha);
 	const mirror = await getMirrorReadContext();
-	if (mirror) {
-		await deleteWorkspaceMirrorPath(mirror.workspaceId, safePath);
-		const commitSha = data.commit?.sha;
-		if (commitSha) {
-			await bumpWorkspaceLastSyncedSha(mirror.workspaceId, commitSha);
+
+	if (!resolvedSha) {
+		if (mirror) {
+			await deleteWorkspaceMirrorPath(mirror.workspaceId, safePath);
 		}
+		return;
+	}
+
+	try {
+		const token = await ensureVaultGitHubWriteToken(workspaceId);
+		const octokit = getOctokitClient(token);
+		const { data } = await octokit.rest.repos.deleteFile({
+			owner,
+			repo,
+			path: safePath,
+			message: `Delete ${safePath}`,
+			sha: resolvedSha,
+			branch,
+		});
+
+		if (mirror) {
+			await deleteWorkspaceMirrorPath(mirror.workspaceId, safePath);
+			const commitSha = data.commit?.sha;
+			if (commitSha) {
+				await bumpWorkspaceLastSyncedSha(mirror.workspaceId, commitSha);
+			}
+		}
+	} catch (error) {
+		throw formatGitHubVaultWriteError(error);
 	}
 }
 
@@ -120,31 +140,39 @@ export async function createOrUpdateGitHubFile(
 ) {
 	const safePath = assertSafeVaultContentPath(path);
 	await requireActiveWorkspaceVaultLinked();
-	const { owner, repo, branch } = await getVaultConfig();
+	const { owner, repo, branch, workspaceId } = await getCachedVaultConfig();
+	if (!workspaceId) throw new Error("No active workspace for vault write");
+
 	const contentBase64 = Buffer.from(content, "utf-8").toString("base64");
-	const octokit = await getOctokit();
+	const resolvedSha = sha ? await resolveFileSha(safePath, sha) : undefined;
 
-	const { data } = await octokit.rest.repos.createOrUpdateFileContents({
-		owner,
-		repo,
-		path: safePath,
-		message,
-		content: contentBase64,
-		branch,
-		...(sha && !isMirrorPlaceholderSha(sha) ? { sha } : {}),
-	});
+	try {
+		const token = await ensureVaultGitHubWriteToken(workspaceId);
+		const octokit = getOctokitClient(token);
+		const { data } = await octokit.rest.repos.createOrUpdateFileContents({
+			owner,
+			repo,
+			path: safePath,
+			message,
+			content: contentBase64,
+			branch,
+			...(resolvedSha ? { sha: resolvedSha } : {}),
+		});
 
-	const mirror = await getMirrorReadContext();
-	if (mirror) {
-		const newSha = data.content?.sha ?? undefined;
-		await upsertWorkspaceMirrorFile(mirror.workspaceId, safePath, content, newSha);
-		const commitSha = data.commit?.sha;
-		if (commitSha) {
-			await bumpWorkspaceLastSyncedSha(mirror.workspaceId, commitSha);
+		const mirror = await getMirrorReadContext();
+		if (mirror) {
+			const newSha = data.content?.sha ?? undefined;
+			await upsertWorkspaceMirrorFile(mirror.workspaceId, safePath, content, newSha);
+			const commitSha = data.commit?.sha;
+			if (commitSha) {
+				await bumpWorkspaceLastSyncedSha(mirror.workspaceId, commitSha);
+			}
 		}
-	}
 
-	return data;
+		return data;
+	} catch (error) {
+		throw formatGitHubVaultWriteError(error);
+	}
 }
 
 export async function getGitHubItem(path: string = "") {

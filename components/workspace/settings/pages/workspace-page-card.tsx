@@ -22,9 +22,11 @@ import {
 	WORKSPACE_PAGE_TEMPLATES,
 	getWorkspacePageTemplate,
 } from "@/lib/workspace-page-templates";
+import { pageSlugFromLabel } from "@/lib/workspace-page-slug";
 
 export type PagePatch = {
 	label?: string;
+	slug?: string;
 	templateKey?: string;
 	config?: Record<string, unknown> | null;
 	isEnabled?: boolean;
@@ -144,7 +146,14 @@ export function WorkspacePageCard({
 								}}
 								onBlur={() => {
 									if (label !== pageRef.current.label) {
-										persist({ label });
+										const template = getWorkspacePageTemplate(pageRef.current.templateKey);
+										persist({
+											label,
+											slug: pageSlugFromLabel(
+												label,
+												template?.defaultSlug ?? "page",
+											),
+										});
 									}
 								}}
 								disabled={!canEdit || disabled}

@@ -102,7 +102,7 @@
 │   ├── github/
 │   │   ├── mirror-context.ts
 │   │   ├── octokit.ts
-│   │   └── token.ts             # getGitHubTokenForWorkspace (PAT → owner OAuth)
+│   │   └── token.ts             # getGitHubTokenForWorkspace (workspace PAT only)
 │   ├── invitation-utils.ts
 │   ├── invitations/             # Invitation resolution logic
 │   │   ├── accept-app-invitation-by-token.ts

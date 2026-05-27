@@ -117,8 +117,11 @@ export const authLayoutMetadata: Metadata = {
 	},
 };
 
-export async function generateTaskDetailMetadata(slug: string): Promise<Metadata> {
-	const data = await loadTaskDetailPageData(slug);
+export async function generateTaskDetailMetadata(
+	slug: string,
+	tasksFolder?: string,
+): Promise<Metadata> {
+	const data = await loadTaskDetailPageData(slug, tasksFolder);
 	return detailPageMetadata("Aufgaben", data?.task.title, slug);
 }
 

@@ -7,6 +7,7 @@ import { PageLoadingShell } from "@/components/loading/page-loading-shell";
 import { childPageMetadata } from "@/lib/page-metadata";
 import { ProduktIdeenPageContent } from "@/app/(dashboard)/produkt-ideen/produkt-ideen-page-content";
 import { AufgabenPageContent } from "@/app/(dashboard)/aufgaben/aufgaben-page-content";
+import { getTasksFolderFromPage } from "@/lib/workspace-page-data-folder";
 import { ProjectsPageContent } from "@/app/(dashboard)/projects/projects-page-content";
 import { ZeiterfassungPageContent } from "@/app/(dashboard)/zeiterfassung/zeiterfassung-page-content";
 
@@ -69,7 +70,7 @@ export default async function WorkspaceTemplatePage({
 			isEnabled: true,
 			workspace: { slug: workspaceSlug },
 		},
-		select: { templateKey: true, label: true, workspaceId: true },
+		select: { templateKey: true, label: true, workspaceId: true, config: true, slug: true },
 	});
 
 	if (!workspacePage) notFound();
@@ -98,7 +99,15 @@ export default async function WorkspaceTemplatePage({
 			}
 		>
 			{workspacePage.templateKey === "aufgaben" ? (
-				<AufgabenPageContent workspaceSlug={workspaceSlug} />
+				<AufgabenPageContent
+					workspaceSlug={workspaceSlug}
+					pageSlug={workspacePage.slug}
+					tasksFolder={getTasksFolderFromPage(
+						workspacePage.config as Record<string, unknown> | null,
+						workspacePage.templateKey,
+					)}
+					pageLabel={displayLabel}
+				/>
 			) : (
 				<Component />
 			)}

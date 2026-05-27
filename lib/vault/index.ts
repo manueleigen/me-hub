@@ -1,3 +1,4 @@
+import { after } from "next/server";
 import { features } from "@/lib/config";
 import type { VaultFile, VaultTreeNode } from "@/types/vault";
 import { getVaultBreadcrumbs } from "@/lib/vault/tree-utils";
@@ -8,14 +9,24 @@ import {
 	deleteGitHubFile,
 } from "@/app/actions/github";
 import { VaultPathExistsError, isGithubPathExistsError } from "@/lib/vault/errors";
+import {
+	getWorkspaceMirrorFile,
+	upsertWorkspaceMirrorFile,
+	deleteWorkspaceMirrorPath,
+	deleteWorkspaceMirrorPaths,
+	listWorkspaceMirrorPathsWithPrefix,
+} from "@/lib/mirror/workspace-mirror";
+import { revalidateWorkspaceVaultCache } from "@/lib/cache/vault-tags";
 
 function normalizeGitTree(gitData: unknown): any[] {
 	if (!gitData || !Array.isArray(gitData)) return [];
 	return gitData;
 }
 
-export function createVaultService(opts: { githubSync?: boolean } = {}) {
+export function createVaultService(opts: { githubSync?: boolean; workspaceId?: string | null } = {}) {
 	const useGithubSync = opts.githubSync ?? features.githubSync;
+	const workspaceId = opts.workspaceId ?? null;
+	const canBackgroundWrite = useGithubSync && Boolean(workspaceId);
 
 	return {
 		async getTree(): Promise<VaultTreeNode[]> {
@@ -78,6 +89,21 @@ export function createVaultService(opts: { githubSync?: boolean } = {}) {
 		async saveFile(path: string, content: string): Promise<boolean> {
 			if (!features.editing) throw new Error("Editing is disabled");
 
+			if (canBackgroundWrite) {
+				const existing = await getWorkspaceMirrorFile(workspaceId!, path);
+				const sha = existing?.sha;
+				await upsertWorkspaceMirrorFile(workspaceId!, path, content, null);
+				revalidateWorkspaceVaultCache(workspaceId!);
+				after(async () => {
+					try {
+						await createOrUpdateGitHubFile(path, content, `Update ${path}`, sha);
+					} catch (err) {
+						console.error(`[vault] after() saveFile failed ${path}:`, err);
+					}
+				});
+				return true;
+			}
+
 			if (useGithubSync) {
 				const current = await getGitHubItem(path);
 				const sha =
@@ -85,9 +111,7 @@ export function createVaultService(opts: { githubSync?: boolean } = {}) {
 						? (current.sha as string)
 						: undefined;
 				await createOrUpdateGitHubFile(path, content, `Update ${path}`, sha);
-				return true;
 			}
-
 			console.log(`[Vault] Saving file: ${path}`);
 			return true;
 		},
@@ -99,17 +123,32 @@ export function createVaultService(opts: { githubSync?: boolean } = {}) {
 			const filePath = parentPath ? `${parentPath}/${fileName}` : fileName;
 			const content = `# ${fileName.replace(/\.md$/i, "")}\n`;
 
+			if (canBackgroundWrite) {
+				const existing = await getWorkspaceMirrorFile(workspaceId!, filePath);
+				if (existing) throw new VaultPathExistsError(fileName, "file");
+				await upsertWorkspaceMirrorFile(workspaceId!, filePath, content, null);
+				revalidateWorkspaceVaultCache(workspaceId!);
+				after(async () => {
+					try {
+						await createOrUpdateGitHubFile(filePath, content, `Create ${fileName}`);
+					} catch (err) {
+						if (isGithubPathExistsError(err)) {
+							console.warn(`[vault] after() createFile conflict ${filePath} — already on GitHub`);
+						} else {
+							console.error(`[vault] after() createFile failed ${filePath}:`, err);
+						}
+					}
+				});
+				return { path: filePath, name: fileName, title: fileName, content, type: "file" };
+			}
+
 			if (useGithubSync) {
 				const existing = await getGitHubItem(filePath);
 				if (existing && !Array.isArray(existing)) {
 					throw new VaultPathExistsError(fileName, "file");
 				}
 				try {
-					await createOrUpdateGitHubFile(
-						filePath,
-						content,
-						`Create ${fileName}`,
-					);
+					await createOrUpdateGitHubFile(filePath, content, `Create ${fileName}`);
 				} catch (err) {
 					if (isGithubPathExistsError(err)) {
 						throw new VaultPathExistsError(fileName, "file");
@@ -125,18 +164,32 @@ export function createVaultService(opts: { githubSync?: boolean } = {}) {
 			if (!features.editing) throw new Error("Editing is disabled");
 
 			const folderPath = parentPath ? `${parentPath}/${name}` : name;
+			const gitkeepPath = `${folderPath}/.gitkeep`;
+
+			if (canBackgroundWrite) {
+				const existingChildren = await listWorkspaceMirrorPathsWithPrefix(workspaceId!, folderPath);
+				if (existingChildren.length > 0) throw new VaultPathExistsError(name, "folder");
+				await upsertWorkspaceMirrorFile(workspaceId!, gitkeepPath, "", null);
+				revalidateWorkspaceVaultCache(workspaceId!);
+				after(async () => {
+					try {
+						await createOrUpdateGitHubFile(gitkeepPath, "", `Create folder ${name}`);
+					} catch (err) {
+						if (isGithubPathExistsError(err)) {
+							console.warn(`[vault] after() createFolder conflict ${folderPath}`);
+						} else {
+							console.error(`[vault] after() createFolder failed ${folderPath}:`, err);
+						}
+					}
+				});
+				return true;
+			}
 
 			if (useGithubSync) {
 				const existing = await getGitHubItem(folderPath);
-				if (existing) {
-					throw new VaultPathExistsError(name, "folder");
-				}
+				if (existing) throw new VaultPathExistsError(name, "folder");
 				try {
-					await createOrUpdateGitHubFile(
-						`${folderPath}/.gitkeep`,
-						"",
-						`Create folder ${name}`,
-					);
+					await createOrUpdateGitHubFile(gitkeepPath, "", `Create folder ${name}`);
 				} catch (err) {
 					if (isGithubPathExistsError(err)) {
 						throw new VaultPathExistsError(name, "folder");
@@ -151,6 +204,21 @@ export function createVaultService(opts: { githubSync?: boolean } = {}) {
 		async deleteFile(path: string): Promise<boolean> {
 			if (!features.editing) throw new Error("Editing is disabled");
 
+			if (canBackgroundWrite) {
+				const existing = await getWorkspaceMirrorFile(workspaceId!, path);
+				const sha = existing?.sha;
+				await deleteWorkspaceMirrorPath(workspaceId!, path);
+				revalidateWorkspaceVaultCache(workspaceId!);
+				after(async () => {
+					try {
+						await deleteGitHubFile(path, sha ?? "mirror");
+					} catch (err) {
+						console.error(`[vault] after() deleteFile failed ${path}:`, err);
+					}
+				});
+				return true;
+			}
+
 			if (useGithubSync) {
 				const item = await getGitHubItem(path);
 				if (!item || Array.isArray(item)) throw new Error("File not found");
@@ -162,6 +230,26 @@ export function createVaultService(opts: { githubSync?: boolean } = {}) {
 
 		async deleteFolder(path: string): Promise<boolean> {
 			if (!features.editing) throw new Error("Editing is disabled");
+
+			if (canBackgroundWrite) {
+				const paths = await listWorkspaceMirrorPathsWithPrefix(workspaceId!, path);
+				const files = await Promise.all(paths.map(p => getWorkspaceMirrorFile(workspaceId!, p)));
+				await deleteWorkspaceMirrorPaths(workspaceId!, paths);
+				revalidateWorkspaceVaultCache(workspaceId!);
+				after(async () => {
+					await Promise.all(
+						files.map(async (f) => {
+							if (!f) return;
+							try {
+								await deleteGitHubFile(f.path, f.sha);
+							} catch (err) {
+								console.error(`[vault] after() deleteFolder item failed ${f.path}:`, err);
+							}
+						})
+					);
+				});
+				return true;
+			}
 
 			if (useGithubSync) {
 				const treeData = normalizeGitTree(await getGitHubTree());
@@ -186,6 +274,25 @@ export function createVaultService(opts: { githubSync?: boolean } = {}) {
 			const fileName = newName.endsWith(".md") ? newName : `${newName}.md`;
 			const newPath = parentPath ? `${parentPath}/${fileName}` : fileName;
 
+			if (canBackgroundWrite) {
+				const existing = await getWorkspaceMirrorFile(workspaceId!, oldPath);
+				if (!existing) throw new Error("File not found");
+				await deleteWorkspaceMirrorPath(workspaceId!, oldPath);
+				await upsertWorkspaceMirrorFile(workspaceId!, newPath, existing.content, null);
+				revalidateWorkspaceVaultCache(workspaceId!);
+				after(async () => {
+					try {
+						await Promise.all([
+							createOrUpdateGitHubFile(newPath, existing.content, `Rename ${oldPath} to ${newPath}`),
+							deleteGitHubFile(oldPath, existing.sha),
+						]);
+					} catch (err) {
+						console.error(`[vault] after() renameFile failed ${oldPath}→${newPath}:`, err);
+					}
+				});
+				return { path: newPath, name: fileName, title: fileName, type: "file" };
+			}
+
 			if (useGithubSync) {
 				const item = await getGitHubItem(oldPath);
 				if (!item || Array.isArray(item)) throw new Error("File not found");
@@ -207,6 +314,38 @@ export function createVaultService(opts: { githubSync?: boolean } = {}) {
 			parts.pop();
 			const parentPath = parts.join("/");
 			const newPath = parentPath ? `${parentPath}/${newName}` : newName;
+
+			if (canBackgroundWrite) {
+				const paths = await listWorkspaceMirrorPathsWithPrefix(workspaceId!, oldPath);
+				const files = await Promise.all(paths.map(p => getWorkspaceMirrorFile(workspaceId!, p)));
+				await deleteWorkspaceMirrorPaths(workspaceId!, paths);
+				await Promise.all(
+					files.map(async (f) => {
+						if (!f) return;
+						const relPath = f.path.slice(oldPath.length + 1);
+						await upsertWorkspaceMirrorFile(workspaceId!, `${newPath}/${relPath}`, f.content, null);
+					})
+				);
+				revalidateWorkspaceVaultCache(workspaceId!);
+				after(async () => {
+					await Promise.all(
+						files.map(async (f) => {
+							if (!f) return;
+							const relPath = f.path.slice(oldPath.length + 1);
+							const newFilePath = `${newPath}/${relPath}`;
+							try {
+								await Promise.all([
+									createOrUpdateGitHubFile(newFilePath, f.content, `Move to ${newFilePath}`),
+									deleteGitHubFile(f.path, f.sha),
+								]);
+							} catch (err) {
+								console.error(`[vault] after() renameFolder item failed ${f.path}:`, err);
+							}
+						})
+					);
+				});
+				return true;
+			}
 
 			if (useGithubSync) {
 				const treeData = normalizeGitTree(await getGitHubTree());
@@ -243,6 +382,25 @@ export function createVaultService(opts: { githubSync?: boolean } = {}) {
 				? `${targetFolderPath}/${fileName}`
 				: fileName;
 
+			if (canBackgroundWrite) {
+				const existing = await getWorkspaceMirrorFile(workspaceId!, sourcePath);
+				if (!existing) throw new Error("File not found");
+				await deleteWorkspaceMirrorPath(workspaceId!, sourcePath);
+				await upsertWorkspaceMirrorFile(workspaceId!, newPath, existing.content, null);
+				revalidateWorkspaceVaultCache(workspaceId!);
+				after(async () => {
+					try {
+						await Promise.all([
+							createOrUpdateGitHubFile(newPath, existing.content, `Move ${sourcePath} to ${newPath}`),
+							deleteGitHubFile(sourcePath, existing.sha),
+						]);
+					} catch (err) {
+						console.error(`[vault] after() moveFile failed ${sourcePath}→${newPath}:`, err);
+					}
+				});
+				return true;
+			}
+
 			if (useGithubSync) {
 				const item = await getGitHubItem(sourcePath);
 				if (!item || Array.isArray(item)) throw new Error("File not found");
@@ -269,6 +427,21 @@ export function createVaultService(opts: { githubSync?: boolean } = {}) {
 					? `${fileName.slice(0, dot)}-kopie${fileName.slice(dot)}`
 					: `${fileName}-kopie.md`;
 			const newPath = parentPath ? `${parentPath}/${newFileName}` : newFileName;
+
+			if (canBackgroundWrite) {
+				const existing = await getWorkspaceMirrorFile(workspaceId!, path);
+				if (!existing) throw new Error("File not found");
+				await upsertWorkspaceMirrorFile(workspaceId!, newPath, existing.content, null);
+				revalidateWorkspaceVaultCache(workspaceId!);
+				after(async () => {
+					try {
+						await createOrUpdateGitHubFile(newPath, existing.content, `Duplicate ${path}`);
+					} catch (err) {
+						console.error(`[vault] after() duplicateFile failed ${newPath}:`, err);
+					}
+				});
+				return { path: newPath, name: newFileName, title: newFileName, type: "file" };
+			}
 
 			if (useGithubSync) {
 				const item = await getGitHubItem(path);
